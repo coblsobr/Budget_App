@@ -10,6 +10,7 @@ import {
   Txn,
 } from './types';
 import { DEFAULT_CATEGORIES } from './categories';
+import { PRIORITIES_HISTORY } from './history.generated';
 
 /**
  * DUMMY DATA
@@ -206,6 +207,8 @@ export const sampleDataSet: DataSet = {
   ],
   txnPerson: {},
   excludedTxns: {},
+  // Your real net-worth history from "Priorities - Finances.csv" (when generated).
+  snapshots: PRIORITIES_HISTORY.length ? PRIORITIES_HISTORY : undefined,
 };
 
 // Net worth history derived to trend upward toward today's snapshot.
