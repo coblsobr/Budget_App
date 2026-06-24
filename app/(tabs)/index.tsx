@@ -47,7 +47,10 @@ export default function Dashboard() {
   return (
     <Screen title="Overview" subtitle={`${monthLabelLong(ym)}${source === 'sample' ? ' · Sample data' : ''}`}>
       {/* Net worth hero */}
-      <Card style={{ backgroundColor: palette.primarySoft, borderColor: palette.primary }}>
+      <Card
+        style={{ backgroundColor: palette.primarySoft, borderColor: palette.primary }}
+        onPress={() => router.push('/breakdown/networth')}
+      >
         <Text style={{ color: palette.textMuted, fontSize: type.small, fontWeight: '600' }}>Net Worth</Text>
         <Text style={{ color: palette.text, fontSize: type.display, fontWeight: '800', marginTop: 4 }}>
           {money(netWorth(data))}
@@ -61,13 +64,16 @@ export default function Dashboard() {
         <View style={{ marginTop: space.md, marginHorizontal: -space.sm }}>
           <LineChart data={nwSeries} labels={nwLabels} width={chartW} height={140} color={palette.primary} />
         </View>
+        <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '600', marginTop: 6 }}>
+          Tap for monthly history ›
+        </Text>
       </Card>
 
       {/* This month */}
       <SectionTitle>This Month</SectionTitle>
       <Row style={{ gap: space.md }}>
         <StatTile label="Income" value={moneyCompact(income)} accent={palette.positive} />
-        <StatTile label="Spent" value={moneyCompact(spent)} accent={palette.negative} />
+        <StatTile label="Spent" value={moneyCompact(spent)} accent={palette.negative} onPress={() => router.push('/breakdown/spending')} />
         <StatTile label="Saved" value={moneyCompact(saved)} accent={saved >= 0 ? palette.positive : palette.negative} />
       </Row>
 
@@ -90,7 +96,7 @@ export default function Dashboard() {
 
       {/* Projected savings */}
       <SectionTitle>Projected Savings</SectionTitle>
-      <Card>
+      <Card onPress={() => router.push('/breakdown/projection')}>
         <Row style={{ justifyContent: 'space-between' }}>
           <View>
             <Text style={{ color: palette.textMuted, fontSize: type.small }}>In 12 months</Text>
@@ -108,6 +114,9 @@ export default function Dashboard() {
         <View style={{ marginTop: space.md, marginHorizontal: -space.sm }}>
           <LineChart data={projSeries} labels={projLabels} width={chartW} height={140} color={palette.positive} />
         </View>
+        <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '600', marginTop: 6 }}>
+          Tap to see how it's calculated ›
+        </Text>
       </Card>
 
       {/* Quick links */}

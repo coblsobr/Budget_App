@@ -74,7 +74,11 @@ export default function Spending() {
       </ScrollView>
 
       {/* Donut + breakdown */}
-      <Card>
+      <Card
+        onPress={() =>
+          router.push({ pathname: '/breakdown/spending', params: { start: period.start, end: period.end, label: period.label } })
+        }
+      >
         <Row style={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <DonutChart
             segments={segments.length ? segments : [{ value: 1, color: palette.surfaceAlt }]}
@@ -100,6 +104,9 @@ export default function Spending() {
             )}
           </View>
         </Row>
+        <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '600', marginTop: 10 }}>
+          Tap for full breakdown by group ›
+        </Text>
       </Card>
 
       {/* Transactions */}

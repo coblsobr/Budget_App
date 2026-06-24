@@ -32,7 +32,7 @@ export default function NetWorth() {
 
   return (
     <Screen title="Net Worth">
-      <Card>
+      <Card onPress={() => router.push('/breakdown/networth')}>
         <Text style={{ color: palette.textMuted, fontSize: type.small, fontWeight: '600' }}>Total Net Worth</Text>
         <Text style={{ color: palette.text, fontSize: type.display, fontWeight: '800', marginTop: 4 }}>
           {money(netWorth(data))}
@@ -45,6 +45,9 @@ export default function NetWorth() {
             From your history: {money(lastSnap.assets - lastSnap.liabilities)} · {monthLabelLong(lastSnap.month)}
           </Text>
         ) : null}
+        <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '600', marginTop: 6 }}>
+          Tap for full history ›
+        </Text>
       </Card>
 
       <Row style={{ gap: space.md }}>

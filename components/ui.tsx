@@ -150,15 +150,17 @@ export function StatTile({
   value,
   accent,
   valueStyle,
+  onPress,
 }: {
   label: string;
   value: string;
   accent?: string;
   valueStyle?: TextStyle;
+  onPress?: () => void;
 }) {
   const { palette } = useTheme();
   return (
-    <Card style={{ flex: 1, padding: space.md }}>
+    <Card style={{ flex: 1, padding: space.md }} onPress={onPress}>
       <Text style={{ color: palette.textMuted, fontSize: type.tiny, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.4 }}>
         {label}
       </Text>
