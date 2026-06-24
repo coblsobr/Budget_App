@@ -71,13 +71,17 @@ export default function Budgets() {
 
       <SectionTitle>Categories</SectionTitle>
       <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: -4 }}>
-        Tap − / + to adjust a category's monthly limit.
+        Tap a group to see its transactions · − / + adjusts its monthly limit.
       </Text>
 
       {rows.map((r) => {
         const over = r.remaining < 0;
         return (
-          <Card key={r.category} style={{ paddingVertical: space.md }}>
+          <Card
+            key={r.category}
+            onPress={() => router.push({ pathname: '/category/[name]', params: { name: r.category } })}
+            style={{ paddingVertical: space.md }}
+          >
             <Row style={{ justifyContent: 'space-between' }}>
               <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{r.category}</Text>
               <Text
