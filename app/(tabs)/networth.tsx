@@ -4,7 +4,7 @@ import { Screen, Card, SectionTitle, Row, Dot, StatTile } from '../../components
 import { LineChart } from '../../components/charts';
 import { ChevronRight } from '../../components/icons';
 import { useTheme, type, space } from '../../theme/theme';
-import { money, moneyCompact, monthLabel } from '../../lib/format';
+import { money, moneyCompact, monthLabel, monthLabelLong } from '../../lib/format';
 import {
   netWorth,
   netWorthHistory,
@@ -26,6 +26,7 @@ export default function NetWorth() {
 
   const accounts = data.accounts;
   const history = netWorthHistory(data);
+  const lastSnap = data.snapshots && data.snapshots.length ? data.snapshots[data.snapshots.length - 1] : null;
   const series = history.map((p) => p.assets - p.liabilities);
   const labels = history.map((p) => monthLabel(p.month));
 
@@ -39,6 +40,11 @@ export default function NetWorth() {
         <View style={{ marginTop: space.md, marginHorizontal: -space.sm }}>
           <LineChart data={series} labels={labels} width={chartW} height={150} color={palette.primary} />
         </View>
+        {lastSnap ? (
+          <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 6 }}>
+            From your history: {money(lastSnap.assets - lastSnap.liabilities)} · {monthLabelLong(lastSnap.month)}
+          </Text>
+        ) : null}
       </Card>
 
       <Row style={{ gap: space.md }}>

@@ -97,7 +97,24 @@ const forest: Palette = {
   chart: ['#34d399', '#facc15', '#60a5fa', '#f472b6', '#f87171', '#2dd4bf', '#a3e635'],
 };
 
-export const PRESETS: Palette[] = [ocean, midnight, forest, daylight];
+const sunset: Palette = {
+  name: 'Sunset',
+  mode: 'dark',
+  bg: '#241023',
+  surface: '#33182f',
+  surfaceAlt: '#3f2038',
+  border: '#4d2a44',
+  text: '#fff1ea',
+  textMuted: '#d3a7a0',
+  primary: '#ff7e5f',
+  primarySoft: '#3f2030',
+  positive: '#5fd0a0',
+  negative: '#ff5d73',
+  warning: '#ffb347',
+  chart: ['#ff7e5f', '#ffb347', '#ff5d73', '#c98bdb', '#ffd166', '#f78ca0', '#9b6dff'],
+};
+
+export const PRESETS: Palette[] = [ocean, midnight, forest, sunset, daylight];
 
 type ThemeContextValue = {
   palette: Palette;
