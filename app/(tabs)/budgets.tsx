@@ -1,15 +1,19 @@
 import { View, Text, Pressable } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen, Card, SectionTitle, Row, ProgressBar } from '../../components/ui';
+import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
 import { money, monthLabelLong } from '../../lib/format';
-import { budgetStatus, thisMonth } from '../../lib/calc';
+import { budgetStatus, personBudgetStatus, thisMonth } from '../../lib/calc';
 import { useData } from '../../lib/DataProvider';
 
 export default function Budgets() {
   const { palette } = useTheme();
+  const router = useRouter();
   const { data, setBudgets } = useData();
   const ym = thisMonth();
   const rows = budgetStatus(data, ym);
+  const people = personBudgetStatus(data, ym);
 
   const totalLimit = rows.reduce((s, r) => s + r.limit, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
@@ -37,6 +41,33 @@ export default function Budgets() {
           <ProgressBar pct={(totalSpent / totalLimit) * 100} />
         </View>
       </Card>
+
+      {people.length > 0 ? (
+        <>
+          <SectionTitle right={<Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>Manage</Text>}>
+            People
+          </SectionTitle>
+          {people.map((p) => {
+            const over = p.remaining < 0;
+            return (
+              <Card key={p.person} onPress={() => router.push({ pathname: '/person/[name]', params: { name: p.person } })} style={{ paddingVertical: space.md }}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{p.person}</Text>
+                  <Row style={{ gap: 4 }}>
+                    <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
+                      {money(p.spent)} / {money(p.limit)}
+                    </Text>
+                    <ChevronRight color={palette.textMuted} size={18} />
+                  </Row>
+                </Row>
+                <View style={{ marginTop: 10 }}>
+                  <ProgressBar pct={p.pct} />
+                </View>
+              </Card>
+            );
+          })}
+        </>
+      ) : null}
 
       <SectionTitle>Categories</SectionTitle>
       <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: -4 }}>

@@ -80,6 +80,13 @@ export type NetWorthPoint = {
 /** merchant (lowercased) -> category. Applied on top of raw categorization. */
 export type MerchantRules = Record<string, string>;
 
+/** A spending allowance for one person, ignoring certain groups (e.g. Housing). */
+export type PersonBudget = {
+  person: string;
+  limit: number; // monthly
+  excludedGroups: string[]; // groups that don't count toward this allowance
+};
+
 export type DataSet = {
   accounts: BankAccount[];
   creditCards: CreditCard[];
@@ -91,6 +98,14 @@ export type DataSet = {
   categories: string[];
   /** Auto-categorization rules: a merchant always maps to a group. */
   merchantRules: MerchantRules;
+  /** People who can own spending (e.g. You, Wife, Shared). */
+  people?: string[];
+  /** Per-person monthly allowances. */
+  personBudgets?: PersonBudget[];
+  /** Per-transaction person override (txnId -> person). Defaults to account owner. */
+  txnPerson?: Record<string, string>;
+  /** Transactions manually removed from personal budgets (txnId -> true). */
+  excludedTxns?: Record<string, boolean>;
   /** Real month-by-month net worth, accumulated from sync snapshots when available. */
   snapshots?: NetWorthPoint[];
 };

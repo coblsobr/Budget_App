@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Budget, DataSet, DataSource, MerchantRules, SyncStatus } from './types';
+import { Budget, DataSet, DataSource, MerchantRules, NetWorthPoint, PersonBudget, SyncStatus } from './types';
 import { sampleDataSet } from './data';
 import { snapshotFor } from './calc';
 import { claimAccessUrl, fetchAccounts, defaultStartDate } from './simplefin';
@@ -18,11 +18,21 @@ import {
   saveCategories,
   loadMerchantRules,
   saveMerchantRules,
+  loadPeople,
+  savePeople,
+  loadPersonBudgets,
+  savePersonBudgets,
+  loadTxnPerson,
+  saveTxnPerson,
+  loadExcludedTxns,
+  saveExcludedTxns,
   loadSnapshots,
+  saveSnapshots,
   recordSnapshot,
   saveLastSync,
   loadLastSync,
 } from './storage';
+import { DEFAULT_PEOPLE } from './people';
 
 type DataContextValue = {
   data: DataSet;
@@ -39,6 +49,12 @@ type DataContextValue = {
   removeCategory: (name: string) => void;
   setMerchantRule: (merchant: string, category: string) => void;
   clearMerchantRule: (merchant: string) => void;
+  importSnapshots: (points: NetWorthPoint[]) => void;
+  addPerson: (name: string) => void;
+  removePerson: (name: string) => void;
+  setPersonBudget: (person: string, limit: number, excludedGroups: string[]) => void;
+  setTxnPerson: (txnId: string, person: string) => void;
+  setTxnExcluded: (txnId: string, excluded: boolean) => void;
 };
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -47,6 +63,10 @@ type Config = {
   budgets?: Budget[];
   categories?: string[];
   merchantRules?: MerchantRules;
+  people?: string[];
+  personBudgets?: PersonBudget[];
+  txnPerson?: Record<string, string>;
+  excludedTxns?: Record<string, boolean>;
   snapshots?: DataSet['snapshots'];
 };
 
@@ -70,21 +90,33 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       budgets: cfg.budgets ?? base.budgets,
       categories: cfg.categories ?? base.categories,
       merchantRules: rules,
+      people: cfg.people ?? base.people ?? DEFAULT_PEOPLE,
+      personBudgets: cfg.personBudgets ?? base.personBudgets ?? [],
+      txnPerson: cfg.txnPerson ?? base.txnPerson ?? {},
+      excludedTxns: cfg.excludedTxns ?? base.excludedTxns ?? {},
       snapshots: cfg.snapshots ?? base.snapshots,
       transactions: applyRules(base.transactions, rules),
     };
   }
 
   async function loadConfig(): Promise<Config> {
-    const [budgets, categories, merchantRules] = await Promise.all([
+    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns] = await Promise.all([
       loadBudgets(),
       loadCategories(),
       loadMerchantRules(),
+      loadPeople(),
+      loadPersonBudgets(),
+      loadTxnPerson(),
+      loadExcludedTxns(),
     ]);
     return {
       budgets: budgets ?? undefined,
       categories: categories ?? undefined,
       merchantRules: merchantRules ?? undefined,
+      people: people ?? undefined,
+      personBudgets: personBudgets ?? undefined,
+      txnPerson: txnPerson ?? undefined,
+      excludedTxns: excludedTxns ?? undefined,
     };
   }
 
@@ -208,6 +240,56 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         delete rules[merchantKey(merchant)];
         saveMerchantRules(rules);
         return { ...prev, merchantRules: rules, transactions: applyRules(rawTxnsRef.current, rules) };
+      });
+    },
+    importSnapshots: (points: NetWorthPoint[]) => {
+      setData((prev) => ({ ...prev, snapshots: points }));
+      saveSnapshots(points);
+    },
+    addPerson: (name: string) => {
+      const clean = name.trim();
+      if (!clean) return;
+      setData((prev) => {
+        const people = prev.people ?? DEFAULT_PEOPLE;
+        if (people.some((p) => p.toLowerCase() === clean.toLowerCase())) return prev;
+        const next = [...people, clean];
+        savePeople(next);
+        return { ...prev, people: next };
+      });
+    },
+    removePerson: (name: string) => {
+      setData((prev) => {
+        const people = (prev.people ?? DEFAULT_PEOPLE).filter((p) => p !== name);
+        savePeople(people);
+        const personBudgets = (prev.personBudgets ?? []).filter((b) => b.person !== name);
+        savePersonBudgets(personBudgets);
+        return { ...prev, people, personBudgets };
+      });
+    },
+    setPersonBudget: (person: string, limit: number, excludedGroups: string[]) => {
+      setData((prev) => {
+        const existing = prev.personBudgets ?? [];
+        const entry: PersonBudget = { person, limit, excludedGroups };
+        const idx = existing.findIndex((b) => b.person === person);
+        const personBudgets = idx >= 0 ? existing.map((b, i) => (i === idx ? entry : b)) : [...existing, entry];
+        savePersonBudgets(personBudgets);
+        return { ...prev, personBudgets };
+      });
+    },
+    setTxnPerson: (txnId: string, person: string) => {
+      setData((prev) => {
+        const map = { ...(prev.txnPerson ?? {}), [txnId]: person };
+        saveTxnPerson(map);
+        return { ...prev, txnPerson: map };
+      });
+    },
+    setTxnExcluded: (txnId: string, excluded: boolean) => {
+      setData((prev) => {
+        const map = { ...(prev.excludedTxns ?? {}) };
+        if (excluded) map[txnId] = true;
+        else delete map[txnId];
+        saveExcludedTxns(map);
+        return { ...prev, excludedTxns: map };
       });
     },
   };

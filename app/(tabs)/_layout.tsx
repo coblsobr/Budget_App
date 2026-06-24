@@ -1,4 +1,5 @@
 import { Tabs } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../../theme/theme';
 import {
   HomeIcon,
@@ -10,6 +11,9 @@ import {
 
 export default function TabsLayout() {
   const { palette } = useTheme();
+  const insets = useSafeAreaInsets();
+  // Lift the bar above Android's gesture / 3-button nav area.
+  const bottomInset = Math.max(insets.bottom, 8);
   return (
     <Tabs
       screenOptions={{
@@ -19,9 +23,9 @@ export default function TabsLayout() {
         tabBarStyle: {
           backgroundColor: palette.surface,
           borderTopColor: palette.border,
-          height: 64,
+          height: 58 + bottomInset,
           paddingTop: 6,
-          paddingBottom: 8,
+          paddingBottom: bottomInset,
         },
         tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
       }}

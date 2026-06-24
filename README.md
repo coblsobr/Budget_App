@@ -28,13 +28,14 @@ From inside the `budget-app` folder:
 
 ```bash
 npm install
-npx expo install expo-secure-store @react-native-async-storage/async-storage
+npx expo install expo-secure-store @react-native-async-storage/async-storage react-native-gesture-handler
 npx expo start
 ```
 
-The second command adds the two storage packages the SimpleFIN integration needs, at
-versions matched to this Expo SDK. (They're only required on Android — the web build
-runs without them.)
+The second command adds the native packages the app needs (secure storage for SimpleFIN,
+and gesture-handler for swipe actions), at versions matched to this Expo SDK. After adding
+gesture-handler you need a fresh APK build for Android (Expo Go / web pick it up
+automatically).
 
 Then:
 

@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { View, Text, Pressable, TextInput, ActivityIndicator, Linking } from 'react-native';
+import { View, Text, Pressable, TextInput, ActivityIndicator, Linking, Platform } from 'react-native';
+import { useRouter } from 'expo-router';
 import { Screen, Card, SectionTitle, Row, ProgressBar } from '../../components/ui';
+import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space, Palette } from '../../theme/theme';
 import { money } from '../../lib/format';
 import { useData } from '../../lib/DataProvider';
+import { parseHistoryCsv } from '../../lib/importHistory';
 
 const ACCENT_SWATCHES = ['#4f8cff', '#a78bfa', '#34d399', '#f472b6', '#fb923c', '#22d3ee', '#facc15', '#f43f5e'];
 const POSITIVE_SWATCHES = ['#33d6a6', '#4ade80', '#22c55e', '#10b981'];
@@ -11,6 +14,7 @@ const NEGATIVE_SWATCHES = ['#ff6b6b', '#fb7185', '#f43f5e', '#ef4444'];
 
 export default function Settings() {
   const { palette, presets, setPreset, setColor, resetCustom } = useTheme();
+  const router = useRouter();
 
   return (
     <Screen title="Settings">
@@ -63,9 +67,27 @@ export default function Settings() {
         <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }}>Reset to default theme</Text>
       </Pressable>
 
+      {/* People */}
+      <SectionTitle>People</SectionTitle>
+      <Card onPress={() => router.push('/people')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>People & Personal Budgets</Text>
+            <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
+              Allowances per person, with groups to ignore
+            </Text>
+          </View>
+          <ChevronRight color={palette.textMuted} />
+        </Row>
+      </Card>
+
       {/* Spending groups */}
       <SectionTitle>Spending Groups</SectionTitle>
       <GroupsCard />
+
+      {/* Import history */}
+      <SectionTitle>Import History</SectionTitle>
+      <ImportHistoryCard />
 
       {/* Connections */}
       <SectionTitle>Connections</SectionTitle>
@@ -79,6 +101,53 @@ export default function Settings() {
         </Row>
       </Card>
     </Screen>
+  );
+}
+
+function ImportHistoryCard() {
+  const { palette } = useTheme();
+  const { importSnapshots, data } = useData();
+  const [msg, setMsg] = useState<string | null>(null);
+  const count = data.snapshots?.length ?? 0;
+
+  const onPick = () => {
+    if (Platform.OS !== 'web') {
+      setMsg('For now, import from the web version. A file picker for Android is coming in the next build.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const { points, rows, skipped } = parseHistoryCsv(text);
+        if (rows === 0) {
+          setMsg('No valid rows found — make sure the Month column looks like 2026-01.');
+          return;
+        }
+        importSnapshots(points);
+        setMsg(`Imported ${rows} month${rows === 1 ? '' : 's'}${skipped ? `, skipped ${skipped} non-data row(s)` : ''}. Check the Net Worth tab.`);
+      } catch {
+        setMsg('Could not read that file. Make sure it’s saved as CSV.');
+      }
+    };
+    input.click();
+  };
+
+  return (
+    <Card style={{ gap: space.md }}>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, lineHeight: 19 }}>
+        Upload your filled-in history template (CSV) to chart real net-worth trends from your past balances.
+        {count > 0 ? ` Currently loaded: ${count} month${count === 1 ? '' : 's'}.` : ''}
+      </Text>
+      <Row style={{ gap: space.md }}>
+        <Button label="Upload CSV" onPress={onPick} primary />
+      </Row>
+      {msg ? <Text style={{ color: palette.text, fontSize: type.small }}>{msg}</Text> : null}
+    </Card>
   );
 }
 

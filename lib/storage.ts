@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { Budget, DataSet, MerchantRules, NetWorthPoint } from './types';
+import { Budget, DataSet, MerchantRules, NetWorthPoint, PersonBudget } from './types';
 
 /**
  * Cross-platform persistence.
@@ -55,9 +55,23 @@ const K = {
   budgets: 'budgets',
   categories: 'categories',
   merchantRules: 'merchant_rules',
+  people: 'people',
+  personBudgets: 'person_budgets',
+  txnPerson: 'txn_person',
+  excludedTxns: 'excluded_txns',
   snapshots: 'networth_snapshots',
   lastSync: 'last_sync',
 } as const;
+
+async function getJSON<T>(key: string): Promise<T | null> {
+  const raw = await kvGet(key);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
 
 // ─── connection (sensitive) ──────────────────────────────────────────────────────
 
@@ -123,7 +137,25 @@ export async function loadMerchantRules(): Promise<MerchantRules | null> {
   }
 }
 
+// ─── people & personal budgets (user-owned) ──────────────────────────────────────
+
+export const savePeople = (people: string[]) => kvSet(K.people, JSON.stringify(people));
+export const loadPeople = () => getJSON<string[]>(K.people);
+
+export const savePersonBudgets = (b: PersonBudget[]) => kvSet(K.personBudgets, JSON.stringify(b));
+export const loadPersonBudgets = () => getJSON<PersonBudget[]>(K.personBudgets);
+
+export const saveTxnPerson = (m: Record<string, string>) => kvSet(K.txnPerson, JSON.stringify(m));
+export const loadTxnPerson = () => getJSON<Record<string, string>>(K.txnPerson);
+
+export const saveExcludedTxns = (m: Record<string, boolean>) => kvSet(K.excludedTxns, JSON.stringify(m));
+export const loadExcludedTxns = () => getJSON<Record<string, boolean>>(K.excludedTxns);
+
 // ─── net worth snapshots (accumulate one per sync/day) ────────────────────────────
+
+export async function saveSnapshots(points: NetWorthPoint[]) {
+  await kvSet(K.snapshots, JSON.stringify(points));
+}
 
 export async function loadSnapshots(): Promise<NetWorthPoint[]> {
   const raw = await kvGet(K.snapshots);

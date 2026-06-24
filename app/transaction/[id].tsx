@@ -8,6 +8,7 @@ import { useData } from '../../lib/DataProvider';
 import { findTxn, accountName } from '../../lib/calc';
 import { spendingCategories } from '../../lib/categories';
 import { merchantKey } from '../../lib/rules';
+import { peopleOf, effectivePerson } from '../../lib/people';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function fullDate(iso: string): string {
@@ -19,7 +20,7 @@ export default function TransactionDetail() {
   const { palette } = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, setMerchantRule, clearMerchantRule, addCategory } = useData();
+  const { data, setMerchantRule, clearMerchantRule, addCategory, setTxnPerson } = useData();
 
   const txn = findTxn(data, String(id));
   const [newGroup, setNewGroup] = useState('');
@@ -74,6 +75,36 @@ export default function TransactionDetail() {
         <DetailRow label="Group" value={txn.category} />
         <DetailRow label="Account" value={accountName(data, txn.accountId)} />
         <DetailRow label="Type" value={isIncome ? 'Income' : 'Spending'} />
+      </Card>
+
+      {/* Person */}
+      <SectionTitle>Person</SectionTitle>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: -4 }}>
+        Whose budget this transaction counts toward.
+      </Text>
+      <Card>
+        <Row style={{ flexWrap: 'wrap', gap: 8 }}>
+          {peopleOf(data).map((p) => {
+            const active = effectivePerson(data, txn.id, txn.accountId) === p;
+            return (
+              <Pressable
+                key={p}
+                onPress={() => setTxnPerson(txn.id, p)}
+                style={{
+                  paddingHorizontal: 14,
+                  paddingVertical: 9,
+                  borderRadius: radius.pill,
+                  backgroundColor: active ? palette.primary : palette.surfaceAlt,
+                }}
+              >
+                <Text style={{ color: active ? '#fff' : palette.text, fontSize: type.small, fontWeight: '600' }}>
+                  {active ? '✓ ' : ''}
+                  {p}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </Row>
       </Card>
 
       {isIncome ? null : (

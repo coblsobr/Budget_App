@@ -199,6 +199,13 @@ export const sampleDataSet: DataSet = {
   budgets,
   categories: DEFAULT_CATEGORIES,
   merchantRules: {},
+  people: ['You', 'Wife', 'Shared'],
+  personBudgets: [
+    { person: 'You', limit: 300, excludedGroups: ['Housing', 'Utilities', 'Transportation'] },
+    { person: 'Wife', limit: 300, excludedGroups: ['Housing', 'Utilities', 'Transportation'] },
+  ],
+  txnPerson: {},
+  excludedTxns: {},
 };
 
 // Net worth history derived to trend upward toward today's snapshot.

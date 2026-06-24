@@ -1,6 +1,7 @@
 import { buildNetWorthHistory } from './data';
 import { Category, DataSet, InvestmentAccount, NetWorthPoint, Txn } from './types';
 import { currentMonthKey } from './format';
+import { effectivePerson, isExcluded } from './people';
 
 /**
  * All derived numbers are pure selectors over a DataSet, so they work identically
@@ -244,6 +245,53 @@ export function accountName(d: DataSet, accountId: string): string {
 
 export function findTxn(d: DataSet, id: string): Txn | undefined {
   return d.transactions.find((t) => t.id === id);
+}
+
+// ─── Personal (per-person) budgets ───────────────────────────────────────────────
+
+/** Spending transactions this month assigned to a person (newest first). */
+export function txnsForPersonMonth(d: DataSet, person: string, ym: string): Txn[] {
+  return txnsForMonth(d, ym)
+    .filter((t) => t.amount < 0 && effectivePerson(d, t.id, t.accountId) === person)
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+}
+
+/** How much counts toward a person's allowance (excludes opted-out txns + groups). */
+export function personSpend(d: DataSet, person: string, ym: string, excludedGroups: string[]): number {
+  const ex = new Set(excludedGroups);
+  return txnsForPersonMonth(d, person, ym).reduce((s, t) => {
+    if (isExcluded(d, t.id)) return s;
+    if (ex.has(t.category)) return s;
+    return s + -t.amount;
+  }, 0);
+}
+
+export type PersonStatus = {
+  person: string;
+  limit: number;
+  spent: number;
+  remaining: number;
+  pct: number;
+  excludedGroups: string[];
+};
+
+export function personBudgetStatus(d: DataSet, ym: string): PersonStatus[] {
+  const budgets = d.personBudgets ?? [];
+  return budgets.map((b) => {
+    const spent = personSpend(d, b.person, ym, b.excludedGroups);
+    return {
+      person: b.person,
+      limit: b.limit,
+      spent,
+      remaining: b.limit - spent,
+      pct: b.limit > 0 ? (spent / b.limit) * 100 : 0,
+      excludedGroups: b.excludedGroups,
+    };
+  });
+}
+
+export function personBudgetFor(d: DataSet, person: string) {
+  return (d.personBudgets ?? []).find((b) => b.person === person);
 }
 
 // ─── Sorting ─────────────────────────────────────────────────────────────────────
