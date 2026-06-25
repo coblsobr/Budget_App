@@ -9,6 +9,7 @@ import { findTxn, accountName } from '../../lib/calc';
 import { spendingCategories } from '../../lib/categories';
 import { merchantKey } from '../../lib/rules';
 import { peopleOf, effectivePerson } from '../../lib/people';
+import { newRuleId } from '../../lib/ignore';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function fullDate(iso: string): string {
@@ -20,11 +21,12 @@ export default function TransactionDetail() {
   const { palette } = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, setMerchantRule, clearMerchantRule, addCategory, setTxnPerson } = useData();
+  const { data, setMerchantRule, clearMerchantRule, addCategory, setTxnPerson, addIgnoreRule } = useData();
 
   const txn = findTxn(data, String(id));
   const [newGroup, setNewGroup] = useState('');
   const [adding, setAdding] = useState(false);
+  const [ignoreMsg, setIgnoreMsg] = useState<string | null>(null);
 
   if (!txn) {
     return (
@@ -106,6 +108,51 @@ export default function TransactionDetail() {
           })}
         </Row>
       </Card>
+
+      {/* Ignore from totals */}
+      <SectionTitle>Ignore</SectionTitle>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: -4 }}>
+        Hide this kind of transaction from all spending, income, and budget totals — for card payments or transfers
+        between your own accounts.
+      </Text>
+      <Card style={{ gap: 0 }}>
+        <IgnoreButton
+          label={`Ignore anything from “${txn.merchant}”`}
+          first
+          onPress={() =>
+            (addIgnoreRule({ id: newRuleId(), merchant: txn.merchant, label: `Anything from ${txn.merchant}` }),
+            setIgnoreMsg(`Now ignoring anything from ${txn.merchant}.`))
+          }
+        />
+        <IgnoreButton
+          label={`Ignore “${txn.merchant}” in ${accountName(data, txn.accountId)}`}
+          onPress={() =>
+            (addIgnoreRule({
+              id: newRuleId(),
+              merchant: txn.merchant,
+              accountId: txn.accountId,
+              label: `${txn.merchant} in ${accountName(data, txn.accountId)}`,
+            }),
+            setIgnoreMsg(`Now ignoring ${txn.merchant} in ${accountName(data, txn.accountId)}.`))
+          }
+        />
+        <IgnoreButton
+          label={`Ignore any amount of ${money(Math.abs(txn.amount), { cents: true })}`}
+          onPress={() =>
+            (addIgnoreRule({
+              id: newRuleId(),
+              amount: Math.abs(txn.amount),
+              label: `Amounts of ${money(Math.abs(txn.amount), { cents: true })}`,
+            }),
+            setIgnoreMsg(`Now ignoring transactions of ${money(Math.abs(txn.amount), { cents: true })}.`))
+          }
+        />
+      </Card>
+      {ignoreMsg ? (
+        <Text style={{ color: palette.positive, fontSize: type.small, fontWeight: '600' }}>
+          {ignoreMsg} Manage rules in Settings → Ignored.
+        </Text>
+      ) : null}
 
       {isIncome ? null : (
         <>
@@ -200,5 +247,24 @@ function DetailRow({ label, value, first }: { label: string; value: string; firs
         {value}
       </Text>
     </Row>
+  );
+}
+
+function IgnoreButton({ label, onPress, first }: { label: string; onPress: () => void; first?: boolean }) {
+  const { palette } = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        {
+          paddingVertical: 13,
+          borderTopWidth: first ? 0 : 1,
+          borderTopColor: palette.border,
+        },
+        pressed && { opacity: 0.6 },
+      ]}
+    >
+      <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }}>{label}</Text>
+    </Pressable>
   );
 }

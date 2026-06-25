@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Budget, DataSet, DataSource, MerchantRules, NetWorthPoint, PersonBudget, SyncStatus } from './types';
+import { Budget, DataSet, DataSource, IgnoreRule, MerchantRules, NetWorthPoint, PersonBudget, SyncStatus } from './types';
 import { sampleDataSet } from './data';
 import { snapshotFor } from './calc';
 import { claimAccessUrl, fetchAccounts, defaultStartDate } from './simplefin';
@@ -26,6 +26,8 @@ import {
   saveTxnPerson,
   loadExcludedTxns,
   saveExcludedTxns,
+  loadIgnoreRules,
+  saveIgnoreRules,
   loadSnapshots,
   saveSnapshots,
   recordSnapshot,
@@ -55,6 +57,8 @@ type DataContextValue = {
   setPersonBudget: (person: string, limit: number, excludedGroups: string[]) => void;
   setTxnPerson: (txnId: string, person: string) => void;
   setTxnExcluded: (txnId: string, excluded: boolean) => void;
+  addIgnoreRule: (rule: IgnoreRule) => void;
+  removeIgnoreRule: (id: string) => void;
 };
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -67,6 +71,7 @@ type Config = {
   personBudgets?: PersonBudget[];
   txnPerson?: Record<string, string>;
   excludedTxns?: Record<string, boolean>;
+  ignoreRules?: IgnoreRule[];
   snapshots?: DataSet['snapshots'];
 };
 
@@ -94,13 +99,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       personBudgets: cfg.personBudgets ?? base.personBudgets ?? [],
       txnPerson: cfg.txnPerson ?? base.txnPerson ?? {},
       excludedTxns: cfg.excludedTxns ?? base.excludedTxns ?? {},
+      ignoreRules: cfg.ignoreRules ?? base.ignoreRules ?? [],
       snapshots: cfg.snapshots ?? base.snapshots,
       transactions: applyRules(base.transactions, rules),
     };
   }
 
   async function loadConfig(): Promise<Config> {
-    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns] = await Promise.all([
+    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules] = await Promise.all([
       loadBudgets(),
       loadCategories(),
       loadMerchantRules(),
@@ -108,6 +114,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadPersonBudgets(),
       loadTxnPerson(),
       loadExcludedTxns(),
+      loadIgnoreRules(),
     ]);
     return {
       budgets: budgets ?? undefined,
@@ -117,6 +124,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       personBudgets: personBudgets ?? undefined,
       txnPerson: txnPerson ?? undefined,
       excludedTxns: excludedTxns ?? undefined,
+      ignoreRules: ignoreRules ?? undefined,
     };
   }
 
@@ -290,6 +298,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         else delete map[txnId];
         saveExcludedTxns(map);
         return { ...prev, excludedTxns: map };
+      });
+    },
+    addIgnoreRule: (rule: IgnoreRule) => {
+      setData((prev) => {
+        const ignoreRules = [...(prev.ignoreRules ?? []), rule];
+        saveIgnoreRules(ignoreRules);
+        return { ...prev, ignoreRules };
+      });
+    },
+    removeIgnoreRule: (id: string) => {
+      setData((prev) => {
+        const ignoreRules = (prev.ignoreRules ?? []).filter((r) => r.id !== id);
+        saveIgnoreRules(ignoreRules);
+        return { ...prev, ignoreRules };
       });
     },
   };

@@ -85,6 +85,10 @@ export default function Settings() {
       <SectionTitle>Spending Groups</SectionTitle>
       <GroupsCard />
 
+      {/* Ignored transactions */}
+      <SectionTitle>Ignored</SectionTitle>
+      <IgnoredRulesCard />
+
       {/* Import history */}
       <SectionTitle>Import History</SectionTitle>
       <ImportHistoryCard />
@@ -147,6 +151,34 @@ function ImportHistoryCard() {
         <Button label="Upload CSV" onPress={onPick} primary />
       </Row>
       {msg ? <Text style={{ color: palette.text, fontSize: type.small }}>{msg}</Text> : null}
+    </Card>
+  );
+}
+
+function IgnoredRulesCard() {
+  const { palette } = useTheme();
+  const { data, removeIgnoreRule } = useData();
+  const rules = data.ignoreRules ?? [];
+
+  return (
+    <Card style={{ gap: rules.length ? space.md : 0 }}>
+      <Text style={{ color: palette.textMuted, fontSize: type.small }}>
+        Transactions matching these are hidden from all totals. Add rules from a transaction’s detail screen.
+      </Text>
+      {rules.length === 0 ? null : (
+        <View style={{ gap: 8 }}>
+          {rules.map((r) => (
+            <Row key={r.id} style={{ justifyContent: 'space-between' }}>
+              <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600', flex: 1, paddingRight: 10 }}>
+                {r.label}
+              </Text>
+              <Pressable onPress={() => removeIgnoreRule(r.id)} hitSlop={8}>
+                <Text style={{ color: palette.negative, fontSize: type.small, fontWeight: '600' }}>Remove</Text>
+              </Pressable>
+            </Row>
+          ))}
+        </View>
+      )}
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { Budget, DataSet, MerchantRules, NetWorthPoint, PersonBudget } from './types';
+import { Budget, DataSet, IgnoreRule, MerchantRules, NetWorthPoint, PersonBudget } from './types';
 
 /**
  * Cross-platform persistence.
@@ -59,6 +59,7 @@ const K = {
   personBudgets: 'person_budgets',
   txnPerson: 'txn_person',
   excludedTxns: 'excluded_txns',
+  ignoreRules: 'ignore_rules',
   snapshots: 'networth_snapshots',
   lastSync: 'last_sync',
 } as const;
@@ -150,6 +151,9 @@ export const loadTxnPerson = () => getJSON<Record<string, string>>(K.txnPerson);
 
 export const saveExcludedTxns = (m: Record<string, boolean>) => kvSet(K.excludedTxns, JSON.stringify(m));
 export const loadExcludedTxns = () => getJSON<Record<string, boolean>>(K.excludedTxns);
+
+export const saveIgnoreRules = (r: IgnoreRule[]) => kvSet(K.ignoreRules, JSON.stringify(r));
+export const loadIgnoreRules = () => getJSON<IgnoreRule[]>(K.ignoreRules);
 
 // ─── net worth snapshots (accumulate one per sync/day) ────────────────────────────
 

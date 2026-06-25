@@ -80,6 +80,19 @@ export type NetWorthPoint = {
 /** merchant (lowercased) -> category. Applied on top of raw categorization. */
 export type MerchantRules = Record<string, string>;
 
+/**
+ * A rule that excludes matching transactions from all spending/income/budget math
+ * (e.g. credit-card payments, transfers between your own accounts). A transaction
+ * matches when ALL specified fields match; at least one field must be set.
+ */
+export type IgnoreRule = {
+  id: string;
+  label: string; // human-readable summary
+  merchant?: string; // case-insensitive substring match on the merchant/description
+  accountId?: string; // limit to one account
+  amount?: number; // match this absolute dollar amount (for repeated transfers)
+};
+
 /** A spending allowance for one person, ignoring certain groups (e.g. Housing). */
 export type PersonBudget = {
   person: string;
@@ -106,6 +119,8 @@ export type DataSet = {
   txnPerson?: Record<string, string>;
   /** Transactions manually removed from personal budgets (txnId -> true). */
   excludedTxns?: Record<string, boolean>;
+  /** Rules that hide matching transactions from all totals (payments/transfers). */
+  ignoreRules?: IgnoreRule[];
   /** Real month-by-month net worth, accumulated from sync snapshots when available. */
   snapshots?: NetWorthPoint[];
 };

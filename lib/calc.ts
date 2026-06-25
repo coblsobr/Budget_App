@@ -2,6 +2,7 @@ import { buildNetWorthHistory } from './data';
 import { Category, DataSet, InvestmentAccount, NetWorthPoint, Txn } from './types';
 import { currentMonthKey } from './format';
 import { effectivePerson, isExcluded } from './people';
+import { isIgnored } from './ignore';
 
 /**
  * All derived numbers are pure selectors over a DataSet, so they work identically
@@ -66,7 +67,7 @@ export function netWorthHistory(d: DataSet): NetWorthPoint[] {
 // ─── Spending & budgets ─────────────────────────────────────────────────────────
 
 export function txnsForMonth(d: DataSet, ym: string): Txn[] {
-  return d.transactions.filter((t) => t.date.startsWith(ym));
+  return d.transactions.filter((t) => t.date.startsWith(ym) && !isIgnored(d, t));
 }
 
 export function spendingByCategory(d: DataSet, ym: string): { category: Category; amount: number }[] {
@@ -214,7 +215,7 @@ export function periodsFor(mode: PeriodMode, count: number): Period[] {
 }
 
 export function txnsInRange(d: DataSet, start: string, end: string): Txn[] {
-  return d.transactions.filter((t) => t.date >= start && t.date < end);
+  return d.transactions.filter((t) => t.date >= start && t.date < end && !isIgnored(d, t));
 }
 
 export function spendingByCategoryRange(d: DataSet, start: string, end: string): { category: Category; amount: number }[] {
