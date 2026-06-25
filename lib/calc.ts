@@ -35,8 +35,12 @@ export function cashTotal(d: DataSet): number {
   return d.accounts.reduce((s, a) => s + a.balance, 0);
 }
 
+export function manualAssetsTotal(d: DataSet): number {
+  return (d.manualAssets ?? []).reduce((s, a) => s + a.value, 0);
+}
+
 export function assetsTotal(d: DataSet): number {
-  return cashTotal(d) + investmentsTotal(d);
+  return cashTotal(d) + investmentsTotal(d) + manualAssetsTotal(d);
 }
 
 export function creditCardDebt(d: DataSet): number {

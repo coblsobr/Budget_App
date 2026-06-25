@@ -12,6 +12,7 @@ import {
   liabilitiesTotal,
   cashTotal,
   investmentsTotal,
+  manualAssetsTotal,
   creditCardDebt,
   loanDebt,
 } from '../../lib/calc';
@@ -66,6 +67,12 @@ export default function NetWorth() {
         value={money(investmentsTotal(data))}
         color={palette.primary}
         onPress={() => router.push('/investments')}
+      />
+      <LineItem
+        label="Manual Assets"
+        value={money(manualAssetsTotal(data))}
+        color={palette.gold}
+        onPress={() => router.push('/assets')}
       />
 
       {/* Liabilities */}

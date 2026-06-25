@@ -7,6 +7,8 @@ import { useTheme, type, radius, space, Palette } from '../../theme/theme';
 import { money } from '../../lib/format';
 import { useData } from '../../lib/DataProvider';
 import { parseHistoryCsv } from '../../lib/importHistory';
+import { parseTransactionCsv, transactionsToCsv, oldestDate } from '../../lib/importTxns';
+import { dateLabel } from '../../lib/format';
 
 const ACCENT_SWATCHES = ['#4f8cff', '#a78bfa', '#34d399', '#f472b6', '#fb923c', '#22d3ee', '#facc15', '#f43f5e'];
 const POSITIVE_SWATCHES = ['#33d6a6', '#4ade80', '#22c55e', '#10b981'];
@@ -89,8 +91,12 @@ export default function Settings() {
       <SectionTitle>Ignored</SectionTitle>
       <IgnoredRulesCard />
 
+      {/* Transactions backup + import */}
+      <SectionTitle>Transactions</SectionTitle>
+      <BackupCard />
+
       {/* Import history */}
-      <SectionTitle>Import History</SectionTitle>
+      <SectionTitle>Net Worth History</SectionTitle>
       <ImportHistoryCard />
 
       {/* Connections */}
@@ -105,6 +111,78 @@ export default function Settings() {
         </Row>
       </Card>
     </Screen>
+  );
+}
+
+function BackupCard() {
+  const { palette } = useTheme();
+  const { data, importTransactions } = useData();
+  const [msg, setMsg] = useState<string | null>(null);
+  const oldest = oldestDate(data.transactions);
+
+  const download = (filename: string, content: string, mime: string) => {
+    if (Platform.OS !== 'web') {
+      setMsg('Export/import runs in the web version for now.');
+      return;
+    }
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportCsv = () => {
+    download('transactions.csv', transactionsToCsv(data.transactions), 'text/csv');
+    setMsg(`Exported ${data.transactions.length} transactions to CSV.`);
+  };
+  const exportJson = () => {
+    download('transactions.json', JSON.stringify(data.transactions, null, 2), 'application/json');
+    setMsg(`Exported ${data.transactions.length} transactions to JSON.`);
+  };
+
+  const importCsv = () => {
+    if (Platform.OS !== 'web') {
+      setMsg('Import runs in the web version for now.');
+      return;
+    }
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,text/csv';
+    input.onchange = async () => {
+      const file = input.files && input.files[0];
+      if (!file) return;
+      try {
+        const { txns, skipped } = parseTransactionCsv(await file.text());
+        if (txns.length === 0) {
+          setMsg('No valid rows found. Make sure the file has Date and Amount columns.');
+          return;
+        }
+        const res = importTransactions(txns);
+        setMsg(`Imported ${res.added} transaction${res.added === 1 ? '' : 's'}; skipped ${res.skipped} duplicate${res.skipped === 1 ? '' : 's'}.`);
+      } catch {
+        setMsg('Could not read that file. Make sure it’s a CSV.');
+      }
+    };
+    input.click();
+  };
+
+  return (
+    <Card style={{ gap: space.md }}>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, lineHeight: 19 }}>
+        {data.transactions.length} transactions stored
+        {oldest ? `, oldest ${dateLabel(oldest)} (${oldest.slice(0, 4)})` : ''}. Back them up, or import a CSV from Rocket
+        Money / your bank (duplicates are skipped automatically).
+      </Text>
+      <Row style={{ gap: space.md }}>
+        <Button label="Export CSV" onPress={exportCsv} primary />
+        <Button label="Export JSON" onPress={exportJson} />
+      </Row>
+      <Button label="Import CSV" onPress={importCsv} />
+      {msg ? <Text style={{ color: palette.text, fontSize: type.small }}>{msg}</Text> : null}
+    </Card>
   );
 }
 

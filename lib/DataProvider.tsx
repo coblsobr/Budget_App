@@ -1,5 +1,16 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-import { Budget, DataSet, DataSource, IgnoreRule, MerchantRules, NetWorthPoint, PersonBudget, SyncStatus } from './types';
+import {
+  Budget,
+  DataSet,
+  DataSource,
+  IgnoreRule,
+  ManualAsset,
+  MerchantRules,
+  NetWorthPoint,
+  PersonBudget,
+  SyncStatus,
+  Txn,
+} from './types';
 import { sampleDataSet } from './data';
 import { snapshotFor } from './calc';
 import { claimAccessUrl, fetchAccounts, defaultStartDate } from './simplefin';
@@ -28,6 +39,10 @@ import {
   saveExcludedTxns,
   loadIgnoreRules,
   saveIgnoreRules,
+  loadManualAssets,
+  saveManualAssets,
+  loadImportedTxns,
+  saveImportedTxns,
   loadSnapshots,
   saveSnapshots,
   recordSnapshot,
@@ -59,6 +74,11 @@ type DataContextValue = {
   setTxnExcluded: (txnId: string, excluded: boolean) => void;
   addIgnoreRule: (rule: IgnoreRule) => void;
   removeIgnoreRule: (id: string) => void;
+  addManualAsset: (asset: ManualAsset) => void;
+  updateManualAsset: (asset: ManualAsset) => void;
+  removeManualAsset: (id: string) => void;
+  /** Merge imported transactions (deduped). Returns counts. */
+  importTransactions: (txns: Txn[]) => { added: number; skipped: number };
 };
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -72,6 +92,8 @@ type Config = {
   txnPerson?: Record<string, string>;
   excludedTxns?: Record<string, boolean>;
   ignoreRules?: IgnoreRule[];
+  manualAssets?: ManualAsset[];
+  importedTxns?: Txn[];
   snapshots?: DataSet['snapshots'];
 };
 
@@ -82,14 +104,19 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
 
-  // The raw (pre-rule) transactions, so we can re-apply / revert merchant rules.
-  const rawTxnsRef = useRef(sampleDataSet.transactions);
+  // The raw (pre-rule) combined transactions, so we can re-apply merchant rules.
+  const rawTxnsRef = useRef<Txn[]>(sampleDataSet.transactions);
+  const baseTxnsRef = useRef<Txn[]>(sampleDataSet.transactions); // source (sample/synced) only
+  const importedRef = useRef<Txn[]>([]); // user-imported via CSV
 
   // Build the displayed dataset from a raw "base" + the user's config, applying
   // merchant rules to the transactions. Stores the raw txns for later re-derivation.
   function compose(base: DataSet, cfg: Config): DataSet {
     const rules = cfg.merchantRules ?? base.merchantRules ?? {};
-    rawTxnsRef.current = base.transactions;
+    baseTxnsRef.current = base.transactions;
+    if (cfg.importedTxns) importedRef.current = cfg.importedTxns;
+    const combined = [...base.transactions, ...importedRef.current];
+    rawTxnsRef.current = combined;
     return {
       ...base,
       budgets: cfg.budgets ?? base.budgets,
@@ -100,13 +127,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       txnPerson: cfg.txnPerson ?? base.txnPerson ?? {},
       excludedTxns: cfg.excludedTxns ?? base.excludedTxns ?? {},
       ignoreRules: cfg.ignoreRules ?? base.ignoreRules ?? [],
+      manualAssets: cfg.manualAssets ?? base.manualAssets ?? [],
       snapshots: cfg.snapshots ?? base.snapshots,
-      transactions: applyRules(base.transactions, rules),
+      transactions: applyRules(combined, rules),
     };
   }
 
   async function loadConfig(): Promise<Config> {
-    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules] = await Promise.all([
+    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules, manualAssets, importedTxns] = await Promise.all([
       loadBudgets(),
       loadCategories(),
       loadMerchantRules(),
@@ -115,6 +143,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadTxnPerson(),
       loadExcludedTxns(),
       loadIgnoreRules(),
+      loadManualAssets(),
+      loadImportedTxns(),
     ]);
     return {
       budgets: budgets ?? undefined,
@@ -125,6 +155,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       txnPerson: txnPerson ?? undefined,
       excludedTxns: excludedTxns ?? undefined,
       ignoreRules: ignoreRules ?? undefined,
+      manualAssets: manualAssets ?? undefined,
+      importedTxns: importedTxns ?? undefined,
     };
   }
 
@@ -313,6 +345,46 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         saveIgnoreRules(ignoreRules);
         return { ...prev, ignoreRules };
       });
+    },
+    addManualAsset: (asset: ManualAsset) => {
+      setData((prev) => {
+        const manualAssets = [...(prev.manualAssets ?? []), asset];
+        saveManualAssets(manualAssets);
+        return { ...prev, manualAssets };
+      });
+    },
+    updateManualAsset: (asset: ManualAsset) => {
+      setData((prev) => {
+        const manualAssets = (prev.manualAssets ?? []).map((a) => (a.id === asset.id ? asset : a));
+        saveManualAssets(manualAssets);
+        return { ...prev, manualAssets };
+      });
+    },
+    removeManualAsset: (id: string) => {
+      setData((prev) => {
+        const manualAssets = (prev.manualAssets ?? []).filter((a) => a.id !== id);
+        saveManualAssets(manualAssets);
+        return { ...prev, manualAssets };
+      });
+    },
+    importTransactions: (txns: Txn[]) => {
+      const existing = data.transactions;
+      const isDup = (t: Txn) =>
+        existing.some(
+          (e) =>
+            e.date === t.date &&
+            Math.abs(e.amount - t.amount) < 0.005 &&
+            e.merchant.trim().toLowerCase() === t.merchant.trim().toLowerCase()
+        );
+      const toAdd = txns.filter((t) => !isDup(t));
+      const skipped = txns.length - toAdd.length;
+      const newImported = [...importedRef.current, ...toAdd];
+      importedRef.current = newImported;
+      saveImportedTxns(newImported);
+      const combined = [...baseTxnsRef.current, ...newImported];
+      rawTxnsRef.current = combined;
+      setData((prev) => ({ ...prev, transactions: applyRules(combined, prev.merchantRules) }));
+      return { added: toAdd.length, skipped };
     },
   };
 

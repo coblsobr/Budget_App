@@ -119,6 +119,19 @@ export default function Dashboard() {
         </Text>
       </Card>
 
+      {/* Trends */}
+      <Card onPress={() => router.push('/trends')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>Trends & Insights</Text>
+            <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
+              Income vs spending, by account, by group
+            </Text>
+          </View>
+          <ChevronRight color={palette.textMuted} />
+        </Row>
+      </Card>
+
       {/* Quick links */}
       <SectionTitle>Accounts</SectionTitle>
       <QuickLink

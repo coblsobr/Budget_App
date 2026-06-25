@@ -1,10 +1,11 @@
+import { useState } from 'react';
 import { View, Text, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen, Card, SectionTitle, Row, ProgressBar } from '../../components/ui';
 import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
-import { money, monthLabelLong } from '../../lib/format';
-import { budgetStatus, personBudgetStatus, thisMonth } from '../../lib/calc';
+import { money, monthLabelLong, dateLabel } from '../../lib/format';
+import { budgetStatus, personBudgetStatus, txnsForMonth, thisMonth } from '../../lib/calc';
 import { useData } from '../../lib/DataProvider';
 
 export default function Budgets() {
@@ -19,11 +20,21 @@ export default function Budgets() {
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
   const totalRemaining = totalLimit - totalSpent;
 
-  // Adjusting a limit writes through the data provider, which persists it.
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const anyExpanded = rows.some((r) => expanded[r.category]);
+  const toggle = (cat: string) => setExpanded((p) => ({ ...p, [cat]: !p[cat] }));
+  const toggleAll = () => {
+    if (anyExpanded) {
+      setExpanded({});
+    } else {
+      const all: Record<string, boolean> = {};
+      rows.forEach((r) => (all[r.category] = true));
+      setExpanded(all);
+    }
+  };
+
   const adjust = (cat: string, delta: number) =>
-    setBudgets(
-      data.budgets.map((b) => (b.category === cat ? { ...b, limit: Math.max(0, b.limit + delta) } : b))
-    );
+    setBudgets(data.budgets.map((b) => (b.category === cat ? { ...b, limit: Math.max(0, b.limit + delta) } : b)));
 
   return (
     <Screen title="Budgets" subtitle={monthLabelLong(ym)}>
@@ -38,13 +49,19 @@ export default function Budgets() {
           </Text>
         </Row>
         <View style={{ marginTop: 10 }}>
-          <ProgressBar pct={(totalSpent / totalLimit) * 100} />
+          <ProgressBar pct={totalLimit > 0 ? (totalSpent / totalLimit) * 100 : 0} />
         </View>
       </Card>
 
       {people.length > 0 ? (
         <>
-          <SectionTitle right={<Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>Manage</Text>}>
+          <SectionTitle
+            right={
+              <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>
+                Manage
+              </Text>
+            }
+          >
             People
           </SectionTitle>
           {people.map((p) => {
@@ -69,43 +86,82 @@ export default function Budgets() {
         </>
       ) : null}
 
-      <SectionTitle>Categories</SectionTitle>
+      <SectionTitle
+        right={
+          <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={toggleAll}>
+            {anyExpanded ? 'Collapse all' : 'Expand all'}
+          </Text>
+        }
+      >
+        Categories
+      </SectionTitle>
       <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: -4 }}>
-        Tap a group to see its transactions · − / + adjusts its monthly limit.
+        Tap a group to expand its transactions · − / + adjusts its monthly limit.
       </Text>
 
       {rows.map((r) => {
         const over = r.remaining < 0;
+        const isOpen = !!expanded[r.category];
+        const txns = isOpen
+          ? txnsForMonth(data, ym)
+              .filter((t) => t.amount < 0 && t.category === r.category)
+              .sort((a, b) => (a.date < b.date ? 1 : -1))
+          : [];
         return (
-          <Card
-            key={r.category}
-            onPress={() => router.push({ pathname: '/category/[name]', params: { name: r.category } })}
-            style={{ paddingVertical: space.md }}
-          >
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{r.category}</Text>
-              <Text
-                style={{
-                  color: over ? palette.negative : palette.textMuted,
-                  fontSize: type.small,
-                  fontWeight: '600',
-                }}
-              >
-                {money(r.spent)} of {money(r.limit)}
-              </Text>
-            </Row>
-            <View style={{ marginVertical: 10 }}>
-              <ProgressBar pct={r.pct} />
-            </View>
-            <Row style={{ justifyContent: 'space-between' }}>
-              <Text style={{ color: over ? palette.negative : palette.positive, fontSize: type.small, fontWeight: '600' }}>
-                {money(Math.abs(r.remaining))} {over ? 'over' : 'left'}
-              </Text>
-              <Row style={{ gap: 8 }}>
-                <Stepper label="−" onPress={() => adjust(r.category, -25)} />
-                <Stepper label="+" onPress={() => adjust(r.category, 25)} />
+          <Card key={r.category} style={{ paddingVertical: space.md }}>
+            <Pressable onPress={() => toggle(r.category)}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Row style={{ gap: 8, flex: 1 }}>
+                  <View style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}>
+                    <ChevronRight color={palette.textMuted} size={18} />
+                  </View>
+                  <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{r.category}</Text>
+                </Row>
+                <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
+                  {money(r.spent)} of {money(r.limit)}
+                </Text>
               </Row>
-            </Row>
+              <View style={{ marginVertical: 10 }}>
+                <ProgressBar pct={r.pct} />
+              </View>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Text style={{ color: over ? palette.negative : palette.positive, fontSize: type.small, fontWeight: '600' }}>
+                  {money(Math.abs(r.remaining))} {over ? 'over' : 'left'}
+                </Text>
+                <Row style={{ gap: 8 }}>
+                  <Stepper label="−" onPress={() => adjust(r.category, -25)} />
+                  <Stepper label="+" onPress={() => adjust(r.category, 25)} />
+                </Row>
+              </Row>
+            </Pressable>
+
+            {isOpen ? (
+              <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: palette.border }}>
+                {txns.length === 0 ? (
+                  <Text style={{ color: palette.textMuted, fontSize: type.small, paddingTop: space.md }}>
+                    No transactions in {r.category} this month.
+                  </Text>
+                ) : (
+                  txns.map((t) => (
+                    <Pressable
+                      key={t.id}
+                      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
+                      style={({ pressed }) => [{ paddingVertical: 10 }, pressed && { opacity: 0.6 }]}
+                    >
+                      <Row style={{ justifyContent: 'space-between' }}>
+                        <View style={{ flex: 1, paddingRight: 10 }}>
+                          <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600' }} numberOfLines={1}>
+                            {t.merchant}
+                          </Text>
+                          <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }}>{dateLabel(t.date)}</Text>
+                        </View>
+                        <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600' }}>{money(t.amount)}</Text>
+                      </Row>
+                    </Pressable>
+                  ))
+                )}
+              </View>
+            ) : null}
           </Card>
         );
       })}

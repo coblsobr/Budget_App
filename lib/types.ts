@@ -121,8 +121,20 @@ export type DataSet = {
   excludedTxns?: Record<string, boolean>;
   /** Rules that hide matching transactions from all totals (payments/transfers). */
   ignoreRules?: IgnoreRule[];
+  /** Manually-entered assets (car, house, etc.) that count toward net worth. */
+  manualAssets?: ManualAsset[];
   /** Real month-by-month net worth, accumulated from sync snapshots when available. */
   snapshots?: NetWorthPoint[];
+};
+
+/** A manually-entered asset not tied to a linked account (car, house, etc.). */
+export type ManualAsset = {
+  id: string;
+  name: string;
+  value: number;
+  kind: 'vehicle' | 'real_estate' | 'investment' | 'cash' | 'other';
+  purchaseDate?: string;
+  purchasePrice?: number;
 };
 
 export type DataSource = 'sample' | 'simplefin';
