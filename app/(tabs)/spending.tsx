@@ -7,6 +7,7 @@ import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
 import { money, dateLabel } from '../../lib/format';
 import { useData } from '../../lib/DataProvider';
+import { detectRecurring, recurringMonthlyTotal } from '../../lib/recurring';
 import {
   periodsFor,
   spendingByCategoryRange,
@@ -51,6 +52,9 @@ export default function Spending() {
   );
 
   const segments = byCat.map((c, i) => ({ value: c.amount, color: palette.chart[i % palette.chart.length] }));
+
+  const recurring = detectRecurring(data);
+  const recurringTop = recurring.slice(0, 4);
 
   const changeMode = (m: PeriodMode) => {
     setMode(m);
@@ -108,6 +112,59 @@ export default function Spending() {
           Tap for full breakdown by group ›
         </Text>
       </Card>
+
+      {/* Recurring */}
+      {recurring.length > 0 ? (
+        <>
+          <SectionTitle
+            right={
+              <Text
+                style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }}
+                onPress={() => router.push('/recurring')}
+              >
+                See all ({recurring.length})
+              </Text>
+            }
+          >
+            Recurring
+          </SectionTitle>
+          <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: -4 }}>
+            ~{money(recurringMonthlyTotal(recurring))}/mo across {recurring.length} repeating charges
+          </Text>
+          <Card style={{ padding: 0 }}>
+            {recurringTop.map((r, i) => (
+              <Pressable
+                key={`${r.merchant}-${i}`}
+                onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: r.latestId } })}
+                style={({ pressed }) => [
+                  {
+                    paddingHorizontal: space.lg,
+                    paddingVertical: space.md,
+                    borderTopWidth: i === 0 ? 0 : 1,
+                    borderTopColor: palette.border,
+                  },
+                  pressed && { backgroundColor: palette.surfaceAlt },
+                ]}
+              >
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1, paddingRight: 10 }}>
+                    <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '600' }} numberOfLines={1}>
+                      {r.merchant}
+                    </Text>
+                    <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '700', marginTop: 3 }}>
+                      {r.cadence}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{money(r.typicalAmount)}</Text>
+                    <Text style={{ color: palette.textMuted, fontSize: type.tiny }}>{money(r.monthlyEquivalent)}/mo</Text>
+                  </View>
+                </Row>
+              </Pressable>
+            ))}
+          </Card>
+        </>
+      ) : null}
 
       {/* Transactions */}
       <SectionTitle right={<Text style={{ color: palette.textMuted, fontSize: type.tiny }}>{txns.length} items</Text>}>

@@ -72,7 +72,7 @@ export default function Dashboard() {
       {/* This month */}
       <SectionTitle>This Month</SectionTitle>
       <Row style={{ gap: space.md }}>
-        <StatTile label="Income" value={moneyCompact(income)} accent={palette.positive} />
+        <StatTile label="Income" value={moneyCompact(income)} accent={palette.positive} onPress={() => router.push('/breakdown/income')} />
         <StatTile label="Spent" value={moneyCompact(spent)} accent={palette.negative} onPress={() => router.push('/breakdown/spending')} />
         <StatTile label="Saved" value={moneyCompact(saved)} accent={saved >= 0 ? palette.positive : palette.negative} />
       </Row>
