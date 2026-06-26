@@ -11,6 +11,7 @@ import {
 } from './types';
 import { DEFAULT_CATEGORIES } from './categories';
 import { PRIORITIES_HISTORY } from './history.generated';
+import { IMPORTED_TXNS } from './importedTxns.generated';
 
 /**
  * DUMMY DATA
@@ -190,13 +191,17 @@ function generateTransactions(): Txn[] {
 
 export const transactions: Txn[] = generateTransactions();
 
+// Use your real imported transactions (Rocket Money) when present; otherwise the
+// generated sample transactions so the app is still demoable.
+const baseTransactions: Txn[] = IMPORTED_TXNS.length ? IMPORTED_TXNS : transactions;
+
 // The complete sample dataset, in the same shape a live SimpleFIN sync produces.
 export const sampleDataSet: DataSet = {
   accounts,
   creditCards,
   investments,
   debts,
-  transactions,
+  transactions: baseTransactions,
   budgets,
   categories: DEFAULT_CATEGORIES,
   merchantRules: {},

@@ -31,6 +31,9 @@ jobs:
       - name: Rebuild net-worth history from CSV
         run: node scripts/build-history.mjs
 
+      - name: Rebuild transactions from Rocket Money CSV
+        run: node scripts/build-expenses.mjs
+
       - name: Set up EAS
         uses: expo/expo-github-action@v8
         with:

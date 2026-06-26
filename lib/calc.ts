@@ -245,6 +245,14 @@ export function accountName(d: DataSet, accountId: string): string {
   if (a) return a.name;
   const c = d.creditCards.find((x) => x.id === accountId);
   if (c) return c.name;
+  // Imported/Rocket Money accounts carry a slugged id like "acct-chase-credit-card-1202".
+  if (/^(acct|imp-acct)-/.test(accountId)) {
+    const pretty = accountId
+      .replace(/^(acct|imp-acct)-/, '')
+      .replace(/-/g, ' ')
+      .replace(/\b\w/g, (m) => m.toUpperCase());
+    return pretty || 'Account';
+  }
   return 'Account';
 }
 
