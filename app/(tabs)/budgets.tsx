@@ -53,38 +53,48 @@ export default function Budgets() {
         </View>
       </Card>
 
-      {people.length > 0 ? (
-        <>
-          <SectionTitle
-            right={
-              <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>
-                Manage
+      <SectionTitle
+        right={
+          <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>
+            {people.length > 0 ? 'Manage' : 'Add'}
+          </Text>
+        }
+      >
+        People
+      </SectionTitle>
+      {people.length === 0 ? (
+        <Card onPress={() => router.push('/people')}>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>Set up personal budgets</Text>
+              <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
+                Give yourself, your wife, etc. a monthly allowance
               </Text>
-            }
-          >
-            People
-          </SectionTitle>
-          {people.map((p) => {
-            const over = p.remaining < 0;
-            return (
-              <Card key={p.person} onPress={() => router.push({ pathname: '/person/[name]', params: { name: p.person } })} style={{ paddingVertical: space.md }}>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{p.person}</Text>
-                  <Row style={{ gap: 4 }}>
-                    <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
-                      {money(p.spent)} / {money(p.limit)}
-                    </Text>
-                    <ChevronRight color={palette.textMuted} size={18} />
-                  </Row>
+            </View>
+            <ChevronRight color={palette.textMuted} />
+          </Row>
+        </Card>
+      ) : (
+        people.map((p) => {
+          const over = p.remaining < 0;
+          return (
+            <Card key={p.person} onPress={() => router.push({ pathname: '/person/[name]', params: { name: p.person } })} style={{ paddingVertical: space.md }}>
+              <Row style={{ justifyContent: 'space-between' }}>
+                <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{p.person}</Text>
+                <Row style={{ gap: 4 }}>
+                  <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
+                    {money(p.spent)} / {money(p.limit)}
+                  </Text>
+                  <ChevronRight color={palette.textMuted} size={18} />
                 </Row>
-                <View style={{ marginTop: 10 }}>
-                  <ProgressBar pct={p.pct} />
-                </View>
-              </Card>
-            );
-          })}
-        </>
-      ) : null}
+              </Row>
+              <View style={{ marginTop: 10 }}>
+                <ProgressBar pct={p.pct} />
+              </View>
+            </Card>
+          );
+        })
+      )}
 
       <SectionTitle
         right={
@@ -109,6 +119,7 @@ export default function Budgets() {
           : [];
         return (
           <Card key={r.category} style={{ paddingVertical: space.md }}>
+            {/* Collapsed header: just name, amount, and progress bar */}
             <Pressable onPress={() => toggle(r.category)}>
               <Row style={{ justifyContent: 'space-between' }}>
                 <Row style={{ gap: 8, flex: 1 }}>
@@ -121,28 +132,30 @@ export default function Budgets() {
                   {money(r.spent)} of {money(r.limit)}
                 </Text>
               </Row>
-              <View style={{ marginVertical: 10 }}>
+              <View style={{ marginTop: 10 }}>
                 <ProgressBar pct={r.pct} />
               </View>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ color: over ? palette.negative : palette.positive, fontSize: type.small, fontWeight: '600' }}>
-                  {money(Math.abs(r.remaining))} {over ? 'over' : 'left'}
-                </Text>
-                <Row style={{ gap: 8 }}>
-                  <Stepper label="−" onPress={() => adjust(r.category, -25)} />
-                  <Stepper label="+" onPress={() => adjust(r.category, 25)} />
-                </Row>
-              </Row>
             </Pressable>
 
+            {/* Expanded: remaining, limit steppers, and transactions */}
             {isOpen ? (
-              <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: palette.border }}>
-                {txns.length === 0 ? (
-                  <Text style={{ color: palette.textMuted, fontSize: type.small, paddingTop: space.md }}>
-                    No transactions in {r.category} this month.
+              <View style={{ marginTop: space.md }}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Text style={{ color: over ? palette.negative : palette.positive, fontSize: type.small, fontWeight: '600' }}>
+                    {money(Math.abs(r.remaining))} {over ? 'over' : 'left'}
                   </Text>
-                ) : (
-                  txns.map((t) => (
+                  <Row style={{ gap: 8 }}>
+                    <Stepper label="−" onPress={() => adjust(r.category, -25)} />
+                    <Stepper label="+" onPress={() => adjust(r.category, 25)} />
+                  </Row>
+                </Row>
+                <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: palette.border }}>
+                  {txns.length === 0 ? (
+                    <Text style={{ color: palette.textMuted, fontSize: type.small, paddingTop: space.md }}>
+                      No transactions in {r.category} this month.
+                    </Text>
+                  ) : (
+                    txns.map((t) => (
                     <Pressable
                       key={t.id}
                       onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
@@ -160,6 +173,7 @@ export default function Budgets() {
                     </Pressable>
                   ))
                 )}
+                </View>
               </View>
             ) : null}
           </Card>
