@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
 import {
+  AccountClass,
+  AccountClassOverrides,
   Budget,
   DataSet,
   DataSource,
@@ -11,6 +13,7 @@ import {
   SyncStatus,
   Txn,
 } from './types';
+import { applyAccountClasses } from './reclass';
 import { sampleDataSet } from './data';
 import { snapshotFor } from './calc';
 import { claimAccessUrl, fetchAccounts, defaultStartDate } from './simplefin';
@@ -41,6 +44,8 @@ import {
   saveIgnoreRules,
   loadManualAssets,
   saveManualAssets,
+  loadAccountClasses,
+  saveAccountClasses,
   loadImportedTxns,
   saveImportedTxns,
   loadSnapshots,
@@ -79,6 +84,9 @@ type DataContextValue = {
   addManualAsset: (asset: ManualAsset) => void;
   updateManualAsset: (asset: ManualAsset) => void;
   removeManualAsset: (id: string) => void;
+  /** What the user says each account really is (fixes misclassification). */
+  accountClasses: AccountClassOverrides;
+  setAccountClass: (accountId: string, cls: AccountClass | null) => Promise<void>;
   /** Merge imported transactions (deduped). Returns counts. */
   importTransactions: (txns: Txn[]) => { added: number; skipped: number };
 };
@@ -97,6 +105,7 @@ type Config = {
   manualAssets?: ManualAsset[];
   importedTxns?: Txn[];
   snapshots?: DataSet['snapshots'];
+  accountClasses?: AccountClassOverrides;
 };
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
@@ -105,6 +114,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<SyncStatus>('idle');
   const [error, setError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  const [accountClasses, setAccountClasses] = useState<AccountClassOverrides>({});
+
+  // Last raw base dataset, so we can re-compose when overrides change.
+  const lastBaseRef = useRef<DataSet>(sampleDataSet);
 
   // The raw (pre-rule) combined transactions, so we can re-apply merchant rules.
   const rawTxnsRef = useRef<Txn[]>(sampleDataSet.transactions);
@@ -115,11 +128,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   // merchant rules to the transactions. Stores the raw txns for later re-derivation.
   function compose(base: DataSet, cfg: Config): DataSet {
     const rules = cfg.merchantRules ?? base.merchantRules ?? {};
+    lastBaseRef.current = base;
     baseTxnsRef.current = base.transactions;
     if (cfg.importedTxns) importedRef.current = cfg.importedTxns;
     const combined = [...base.transactions, ...importedRef.current];
     rawTxnsRef.current = combined;
-    return {
+    const composed: DataSet = {
       ...base,
       budgets: cfg.budgets ?? base.budgets,
       categories: cfg.categories ?? base.categories,
@@ -133,10 +147,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       snapshots: cfg.snapshots ?? base.snapshots,
       transactions: applyRules(combined, rules),
     };
+    // Move any user-reclassified accounts into their correct buckets.
+    return applyAccountClasses(composed, cfg.accountClasses ?? {});
   }
 
   async function loadConfig(): Promise<Config> {
-    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules, manualAssets, importedTxns] = await Promise.all([
+    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules, manualAssets, importedTxns, accountClassesStored] = await Promise.all([
       loadBudgets(),
       loadCategories(),
       loadMerchantRules(),
@@ -147,7 +163,9 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadIgnoreRules(),
       loadManualAssets(),
       loadImportedTxns(),
+      loadAccountClasses(),
     ]);
+    if (accountClassesStored) setAccountClasses(accountClassesStored);
     return {
       budgets: budgets ?? undefined,
       categories: categories ?? undefined,
@@ -159,6 +177,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       ignoreRules: ignoreRules ?? undefined,
       manualAssets: manualAssets ?? undefined,
       importedTxns: importedTxns ?? undefined,
+      accountClasses: accountClassesStored ?? undefined,
     };
   }
 
@@ -172,7 +191,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       const snaps = await recordSnapshot(snapshotFor(normalized));
       const base: DataSet = { ...normalized, snapshots: snaps };
       await saveDataset(base);
-      setData(compose(base, {}));
+      setData(compose(base, cfg));
       const iso = new Date().toISOString();
       await saveLastSync(iso);
       setLastSync(iso);
@@ -400,6 +419,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         saveManualAssets(manualAssets);
         return { ...prev, manualAssets };
       });
+    },
+    accountClasses,
+    setAccountClass: async (accountId: string, cls: AccountClass | null) => {
+      const next: AccountClassOverrides = { ...accountClasses };
+      if (cls) next[accountId] = cls;
+      else delete next[accountId];
+      setAccountClasses(next);
+      await saveAccountClasses(next);
+      // Re-derive the dataset from the raw base so the account moves buckets
+      // immediately (and correctly reverses a previous override).
+      const cfg = await loadConfig();
+      setData(compose(lastBaseRef.current, { ...cfg, accountClasses: next }));
     },
     importTransactions: (txns: Txn[]) => {
       const existing = data.transactions;

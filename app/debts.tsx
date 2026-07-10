@@ -44,11 +44,17 @@ export default function Debts() {
         return (
           <Card key={d.id}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <View>
-                <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>{d.name}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }}>{sub.join(' · ')}</Text>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }} numberOfLines={1}>
+                  {d.name}
+                </Text>
+                <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }} numberOfLines={1}>
+                  {sub.join(' · ')}
+                </Text>
               </View>
-              <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>{money(d.balance)}</Text>
+              <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700', flexShrink: 0 }}>
+                {money(d.balance)}
+              </Text>
             </Row>
 
             {hasProgress ? (

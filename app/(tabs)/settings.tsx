@@ -96,6 +96,20 @@ export default function Settings() {
         </Row>
       </Card>
 
+      {/* Account types */}
+      <SectionTitle>Accounts</SectionTitle>
+      <Card onPress={() => router.push('/account-types')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>Account Types</Text>
+            <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
+              Fix accounts detected as the wrong type (card vs. loan)
+            </Text>
+          </View>
+          <ChevronRight color={palette.textMuted} />
+        </Row>
+      </Card>
+
       {/* Spending groups */}
       <SectionTitle>Spending Groups</SectionTitle>
       <GroupsCard />

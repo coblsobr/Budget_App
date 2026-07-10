@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { Budget, DataSet, IgnoreRule, ManualAsset, MerchantRules, NetWorthPoint, PersonBudget, Txn } from './types';
+import { AccountClassOverrides, Budget, DataSet, IgnoreRule, ManualAsset, MerchantRules, NetWorthPoint, PersonBudget, Txn } from './types';
 
 /**
  * Cross-platform persistence.
@@ -64,6 +64,7 @@ const K = {
   importedTxns: 'imported_txns',
   snapshots: 'networth_snapshots',
   lastSync: 'last_sync',
+  accountClasses: 'account_classes',
 } as const;
 
 async function getJSON<T>(key: string): Promise<T | null> {
@@ -107,6 +108,21 @@ export async function loadBudgets(): Promise<Budget[] | null> {
   if (!raw) return null;
   try {
     return JSON.parse(raw) as Budget[];
+  } catch {
+    return null;
+  }
+}
+
+// ─── account class overrides (user-owned) ────────────────────────────────────────
+
+export async function saveAccountClasses(overrides: AccountClassOverrides) {
+  await kvSet(K.accountClasses, JSON.stringify(overrides));
+}
+export async function loadAccountClasses(): Promise<AccountClassOverrides | null> {
+  const raw = await kvGet(K.accountClasses);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as AccountClassOverrides;
   } catch {
     return null;
   }

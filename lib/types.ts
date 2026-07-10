@@ -1,5 +1,12 @@
 export type AccountKind = 'checking' | 'savings' | 'cash';
 
+/**
+ * User override for which bucket a synced account belongs in (fixes
+ * misclassification, e.g. an auto loan detected as a credit card).
+ */
+export type AccountClass = 'cash' | 'credit' | 'loan' | 'investment';
+export type AccountClassOverrides = Record<string, AccountClass>;
+
 export type BankAccount = {
   id: string;
   name: string;

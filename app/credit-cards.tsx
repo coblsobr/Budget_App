@@ -45,13 +45,17 @@ export default function CreditCards() {
         return (
           <Card key={c.id}>
             <Row style={{ justifyContent: 'space-between' }}>
-              <View>
-                <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>{c.name}</Text>
-                <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }}>
+              <View style={{ flex: 1, paddingRight: 12 }}>
+                <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }} numberOfLines={1}>
+                  {c.name}
+                </Text>
+                <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }} numberOfLines={1}>
                   {c.institution} · {c.owner}
                 </Text>
               </View>
-              <Text style={{ color: palette.negative, fontSize: type.heading, fontWeight: '700' }}>{money(c.balance)}</Text>
+              <Text style={{ color: palette.negative, fontSize: type.heading, fontWeight: '700', flexShrink: 0 }}>
+                {money(c.balance)}
+              </Text>
             </Row>
 
             {hasLimit ? (

@@ -125,11 +125,11 @@ function SubItem({ label, sub, value }: { label: string; sub: string; value: str
   const { palette } = useTheme();
   return (
     <Row style={{ justifyContent: 'space-between', paddingHorizontal: space.sm, paddingVertical: 6 }}>
-      <View>
-        <Text style={{ color: palette.textMuted, fontSize: type.small }}>{label}</Text>
-        <Text style={{ color: palette.textMuted, fontSize: type.tiny, opacity: 0.7 }}>{sub}</Text>
+      <View style={{ flex: 1, paddingRight: 12 }}>
+        <Text style={{ color: palette.textMuted, fontSize: type.small }} numberOfLines={1}>{label}</Text>
+        <Text style={{ color: palette.textMuted, fontSize: type.tiny, opacity: 0.7 }} numberOfLines={1}>{sub}</Text>
       </View>
-      <Text style={{ color: palette.textMuted, fontSize: type.small, fontWeight: '600' }}>{value}</Text>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, fontWeight: '600', flexShrink: 0 }}>{value}</Text>
     </Row>
   );
 }

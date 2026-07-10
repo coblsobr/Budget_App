@@ -33,6 +33,8 @@ function classify(acc: SFAccount): Kind {
   const bal = num(acc.balance);
 
   if (/(mortgage|student loan|auto loan|\bloan\b)/.test(name)) return 'loan';
+  // Auto-financing arms that don't say "loan" in the account name.
+  if (/(honda financial|toyota financial|gm financial|ford credit|ally auto|nissan motor acceptance|hyundai motor finance|kia finance|carmax auto|capital one auto|chrysler capital|vw credit|subaru motors finance)/.test(name)) return 'loan';
   if (/(credit|card|visa|mastercard|amex|american express|discover)/.test(name)) return 'credit';
   if (/(401k|403b|ira|roth|brokerage|invest|hsa|fidelity|vanguard|schwab)/.test(name)) return 'investment';
   if (/(saving|reserve|emergency)/.test(name)) return 'savings';
