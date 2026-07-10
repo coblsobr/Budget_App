@@ -69,7 +69,9 @@ type DataContextValue = {
   importSnapshots: (points: NetWorthPoint[]) => void;
   addPerson: (name: string) => void;
   removePerson: (name: string) => void;
-  setPersonBudget: (person: string, limit: number, excludedGroups: string[]) => void;
+  setPersonBudget: (person: string, limit: number, included?: Record<string, string[]>) => void;
+  setPersonLimit: (person: string, limit: number) => void;
+  setPersonInclusion: (person: string, accountId: string, category: string, on: boolean) => void;
   setTxnPerson: (txnId: string, person: string) => void;
   setTxnExcluded: (txnId: string, excluded: boolean) => void;
   addIgnoreRule: (rule: IgnoreRule) => void;
@@ -306,12 +308,44 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return { ...prev, people, personBudgets };
       });
     },
-    setPersonBudget: (person: string, limit: number, excludedGroups: string[]) => {
+    setPersonBudget: (person: string, limit: number, included?: Record<string, string[]>) => {
       setData((prev) => {
         const existing = prev.personBudgets ?? [];
-        const entry: PersonBudget = { person, limit, excludedGroups };
+        const prior = existing.find((b) => b.person === person);
+        const entry: PersonBudget = { person, limit, included: included ?? prior?.included ?? {} };
         const idx = existing.findIndex((b) => b.person === person);
         const personBudgets = idx >= 0 ? existing.map((b, i) => (i === idx ? entry : b)) : [...existing, entry];
+        savePersonBudgets(personBudgets);
+        return { ...prev, personBudgets };
+      });
+    },
+    setPersonLimit: (person: string, limit: number) => {
+      setData((prev) => {
+        const existing = prev.personBudgets ?? [];
+        const has = existing.some((b) => b.person === person);
+        const personBudgets = has
+          ? existing.map((b) => (b.person === person ? { ...b, limit } : b))
+          : [...existing, { person, limit, included: {} }];
+        savePersonBudgets(personBudgets);
+        return { ...prev, personBudgets };
+      });
+    },
+    setPersonInclusion: (person: string, accountId: string, category: string, on: boolean) => {
+      setData((prev) => {
+        const existing = prev.personBudgets ?? [];
+        const base = existing.some((b) => b.person === person)
+          ? existing
+          : [...existing, { person, limit: 0, included: {} }];
+        const personBudgets = base.map((b) => {
+          if (b.person !== person) return b;
+          const included = { ...(b.included ?? {}) };
+          const cats = new Set(included[accountId] ?? []);
+          if (on) cats.add(category);
+          else cats.delete(category);
+          if (cats.size) included[accountId] = [...cats];
+          else delete included[accountId];
+          return { ...b, included };
+        });
         savePersonBudgets(personBudgets);
         return { ...prev, personBudgets };
       });

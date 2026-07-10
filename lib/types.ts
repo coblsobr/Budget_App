@@ -93,11 +93,16 @@ export type IgnoreRule = {
   amount?: number; // match this absolute dollar amount (for repeated transfers)
 };
 
-/** A spending allowance for one person, ignoring certain groups (e.g. Housing). */
+/**
+ * A spending allowance for one person. Nothing counts by default; the person only
+ * accrues spending from card+category pairs they've explicitly opted in via `included`
+ * (accountId -> the categories on that card that count toward this person).
+ */
 export type PersonBudget = {
   person: string;
   limit: number; // monthly
-  excludedGroups: string[]; // groups that don't count toward this allowance
+  included?: Record<string, string[]>; // accountId -> included categories
+  excludedGroups?: string[]; // legacy (unused by new model, kept for old data)
 };
 
 export type DataSet = {

@@ -1,17 +1,17 @@
-import { useState } from 'react';
-import { View, Text, Pressable } from 'react-native';
+import React from 'react';
+import { View, Text } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Screen, Card, SectionTitle, Row, ProgressBar } from '../../components/ui';
-import { ChevronRight } from '../../components/icons';
+import { Screen, Card, Row, ProgressBar } from '../../components/ui';
+import { BudgetIcon, PeopleIcon, ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
-import { money, monthLabelLong, dateLabel } from '../../lib/format';
-import { budgetStatus, personBudgetStatus, txnsForMonth, thisMonth } from '../../lib/calc';
+import { money, monthLabelLong } from '../../lib/format';
+import { budgetStatus, personBudgetStatus, thisMonth } from '../../lib/calc';
 import { useData } from '../../lib/DataProvider';
 
 export default function Budgets() {
   const { palette } = useTheme();
   const router = useRouter();
-  const { data, setBudgets } = useData();
+  const { data } = useData();
   const ym = thisMonth();
   const rows = budgetStatus(data, ym);
   const people = personBudgetStatus(data, ym);
@@ -19,22 +19,6 @@ export default function Budgets() {
   const totalLimit = rows.reduce((s, r) => s + r.limit, 0);
   const totalSpent = rows.reduce((s, r) => s + r.spent, 0);
   const totalRemaining = totalLimit - totalSpent;
-
-  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
-  const anyExpanded = rows.some((r) => expanded[r.category]);
-  const toggle = (cat: string) => setExpanded((p) => ({ ...p, [cat]: !p[cat] }));
-  const toggleAll = () => {
-    if (anyExpanded) {
-      setExpanded({});
-    } else {
-      const all: Record<string, boolean> = {};
-      rows.forEach((r) => (all[r.category] = true));
-      setExpanded(all);
-    }
-  };
-
-  const adjust = (cat: string, delta: number) =>
-    setBudgets(data.budgets.map((b) => (b.category === cat ? { ...b, limit: Math.max(0, b.limit + delta) } : b)));
 
   return (
     <Screen title="Budgets" subtitle={monthLabelLong(ym)}>
@@ -53,151 +37,57 @@ export default function Budgets() {
         </View>
       </Card>
 
-      <SectionTitle
-        right={
-          <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={() => router.push('/people')}>
-            {people.length > 0 ? 'Manage' : 'Add'}
-          </Text>
-        }
-      >
-        People
-      </SectionTitle>
-      {people.length === 0 ? (
-        <Card onPress={() => router.push('/people')}>
-          <Row style={{ justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, paddingRight: 10 }}>
-              <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>Set up personal budgets</Text>
-              <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
-                Give yourself, your wife, etc. a monthly allowance
-              </Text>
-            </View>
-            <ChevronRight color={palette.textMuted} />
-          </Row>
-        </Card>
-      ) : (
-        people.map((p) => {
-          const over = p.remaining < 0;
-          return (
-            <Card key={p.person} onPress={() => router.push({ pathname: '/person/[name]', params: { name: p.person } })} style={{ paddingVertical: space.md }}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{p.person}</Text>
-                <Row style={{ gap: 4 }}>
-                  <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
-                    {money(p.spent)} / {money(p.limit)}
-                  </Text>
-                  <ChevronRight color={palette.textMuted} size={18} />
-                </Row>
-              </Row>
-              <View style={{ marginTop: 10 }}>
-                <ProgressBar pct={p.pct} />
-              </View>
-            </Card>
-          );
-        })
-      )}
-
-      <SectionTitle
-        right={
-          <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '600' }} onPress={toggleAll}>
-            {anyExpanded ? 'Collapse all' : 'Expand all'}
-          </Text>
-        }
-      >
-        Categories
-      </SectionTitle>
-      <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: -4 }}>
-        Tap a group to expand its transactions · − / + adjusts its monthly limit.
-      </Text>
-
-      {rows.map((r) => {
-        const over = r.remaining < 0;
-        const isOpen = !!expanded[r.category];
-        const txns = isOpen
-          ? txnsForMonth(data, ym)
-              .filter((t) => t.amount < 0 && t.category === r.category)
-              .sort((a, b) => (a.date < b.date ? 1 : -1))
-          : [];
-        return (
-          <Card key={r.category} style={{ paddingVertical: space.md }}>
-            {/* Collapsed header: just name, amount, and progress bar */}
-            <Pressable onPress={() => toggle(r.category)}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Row style={{ gap: 8, flex: 1 }}>
-                  <View style={{ transform: [{ rotate: isOpen ? '90deg' : '0deg' }] }}>
-                    <ChevronRight color={palette.textMuted} size={18} />
-                  </View>
-                  <Text style={{ color: palette.text, fontSize: type.body, fontWeight: '700' }}>{r.category}</Text>
-                </Row>
-                <Text style={{ color: over ? palette.negative : palette.textMuted, fontSize: type.small, fontWeight: '600' }}>
-                  {money(r.spent)} of {money(r.limit)}
-                </Text>
-              </Row>
-              <View style={{ marginTop: 10 }}>
-                <ProgressBar pct={r.pct} />
-              </View>
-            </Pressable>
-
-            {/* Expanded: remaining, limit steppers, and transactions */}
-            {isOpen ? (
-              <View style={{ marginTop: space.md }}>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Text style={{ color: over ? palette.negative : palette.positive, fontSize: type.small, fontWeight: '600' }}>
-                    {money(Math.abs(r.remaining))} {over ? 'over' : 'left'}
-                  </Text>
-                  <Row style={{ gap: 8 }}>
-                    <Stepper label="−" onPress={() => adjust(r.category, -25)} />
-                    <Stepper label="+" onPress={() => adjust(r.category, 25)} />
-                  </Row>
-                </Row>
-                <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: palette.border }}>
-                  {txns.length === 0 ? (
-                    <Text style={{ color: palette.textMuted, fontSize: type.small, paddingTop: space.md }}>
-                      No transactions in {r.category} this month.
-                    </Text>
-                  ) : (
-                    txns.map((t) => (
-                    <Pressable
-                      key={t.id}
-                      onPress={() => router.push({ pathname: '/transaction/[id]', params: { id: t.id } })}
-                      style={({ pressed }) => [{ paddingVertical: 10 }, pressed && { opacity: 0.6 }]}
-                    >
-                      <Row style={{ justifyContent: 'space-between' }}>
-                        <View style={{ flex: 1, paddingRight: 10 }}>
-                          <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600' }} numberOfLines={1}>
-                            {t.merchant}
-                          </Text>
-                          <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }}>{dateLabel(t.date)}</Text>
-                        </View>
-                        <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600' }}>{money(t.amount)}</Text>
-                      </Row>
-                    </Pressable>
-                  ))
-                )}
-                </View>
-              </View>
-            ) : null}
-          </Card>
-        );
-      })}
+      <BigButton
+        icon={<BudgetIcon color={palette.primary} size={26} />}
+        title="Categories"
+        subtitle={`${rows.length} groups · tap to open`}
+        onPress={() => router.push('/budget-categories')}
+      />
+      <BigButton
+        icon={<PeopleIcon color={palette.positive} size={26} />}
+        title="Individual"
+        subtitle={people.length > 0 ? `${people.length} people` : 'Set up per-person budgets'}
+        onPress={() => router.push('/people')}
+      />
     </Screen>
   );
 }
 
-function Stepper({ label, onPress }: { label: string; onPress: () => void }) {
+function BigButton({
+  icon,
+  title,
+  subtitle,
+  onPress,
+}: {
+  icon: React.ReactNode;
+  title: string;
+  subtitle: string;
+  onPress: () => void;
+}) {
   const { palette } = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        width: 34,
-        height: 34,
-        borderRadius: radius.sm,
-        backgroundColor: palette.surfaceAlt,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text style={{ color: palette.primary, fontSize: 20, fontWeight: '700', lineHeight: 22 }}>{label}</Text>
-    </Pressable>
+    <Card onPress={onPress} style={{ paddingVertical: space.xl }}>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Row style={{ gap: space.lg, alignItems: 'center', flex: 1 }}>
+          <View
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: radius.md,
+              backgroundColor: palette.surfaceAlt,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            {icon}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: type.title, fontWeight: '800' }}>{title}</Text>
+            <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>{subtitle}</Text>
+          </View>
+        </Row>
+        <ChevronRight color={palette.textMuted} />
+      </Row>
+    </Card>
   );
 }

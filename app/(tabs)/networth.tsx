@@ -71,7 +71,7 @@ export default function NetWorth() {
       <LineItem
         label="Manual Assets"
         value={money(manualAssetsTotal(data))}
-        color={palette.gold}
+        color={palette.warning}
         onPress={() => router.push('/assets')}
       />
 

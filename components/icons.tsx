@@ -84,6 +84,17 @@ export function InvestIcon({ color, size }: IconProps) {
   );
 }
 
+export function PeopleIcon({ color, size }: IconProps) {
+  return (
+    <Svg {...base(size)} stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <Circle cx={9} cy={7} r={4} />
+      <Path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+      <Path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </Svg>
+  );
+}
+
 export function DebtIcon({ color, size }: IconProps) {
   return (
     <Svg {...base(size)} stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

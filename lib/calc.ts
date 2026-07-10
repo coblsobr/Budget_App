@@ -1,7 +1,7 @@
 import { buildNetWorthHistory } from './data';
 import { Category, DataSet, InvestmentAccount, NetWorthPoint, Txn } from './types';
 import { currentMonthKey } from './format';
-import { effectivePerson, isExcluded } from './people';
+import { isExcluded } from './people';
 import { isIgnored } from './ignore';
 
 /**
@@ -262,21 +262,25 @@ export function findTxn(d: DataSet, id: string): Txn | undefined {
 
 // ─── Personal (per-person) budgets ───────────────────────────────────────────────
 
-/** Spending transactions this month assigned to a person (newest first). */
+/** Whether a transaction counts toward a person, per their card+category includes. */
+export function txnCountsForPerson(d: DataSet, person: string, t: Txn): boolean {
+  if (t.amount >= 0) return false;
+  if (isExcluded(d, t.id)) return false;
+  const pb = (d.personBudgets ?? []).find((b) => b.person === person);
+  const cats = pb?.included?.[t.accountId];
+  return !!cats && cats.includes(t.category);
+}
+
+/** Spending transactions this month that count toward a person (newest first). */
 export function txnsForPersonMonth(d: DataSet, person: string, ym: string): Txn[] {
   return txnsForMonth(d, ym)
-    .filter((t) => t.amount < 0 && effectivePerson(d, t.id, t.accountId) === person)
+    .filter((t) => txnCountsForPerson(d, person, t))
     .sort((a, b) => (a.date < b.date ? 1 : -1));
 }
 
-/** How much counts toward a person's allowance (excludes opted-out txns + groups). */
-export function personSpend(d: DataSet, person: string, ym: string, excludedGroups: string[]): number {
-  const ex = new Set(excludedGroups);
-  return txnsForPersonMonth(d, person, ym).reduce((s, t) => {
-    if (isExcluded(d, t.id)) return s;
-    if (ex.has(t.category)) return s;
-    return s + -t.amount;
-  }, 0);
+/** How much counts toward a person's allowance. */
+export function personSpend(d: DataSet, person: string, ym: string): number {
+  return txnsForPersonMonth(d, person, ym).reduce((s, t) => s + -t.amount, 0);
 }
 
 export type PersonStatus = {
@@ -285,20 +289,18 @@ export type PersonStatus = {
   spent: number;
   remaining: number;
   pct: number;
-  excludedGroups: string[];
 };
 
 export function personBudgetStatus(d: DataSet, ym: string): PersonStatus[] {
   const budgets = d.personBudgets ?? [];
   return budgets.map((b) => {
-    const spent = personSpend(d, b.person, ym, b.excludedGroups);
+    const spent = personSpend(d, b.person, ym);
     return {
       person: b.person,
       limit: b.limit,
       spent,
       remaining: b.limit - spent,
       pct: b.limit > 0 ? (spent / b.limit) * 100 : 0,
-      excludedGroups: b.excludedGroups,
     };
   });
 }

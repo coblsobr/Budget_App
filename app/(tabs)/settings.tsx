@@ -10,9 +10,22 @@ import { parseHistoryCsv } from '../../lib/importHistory';
 import { parseTransactionCsv, transactionsToCsv, oldestDate } from '../../lib/importTxns';
 import { dateLabel } from '../../lib/format';
 
-const ACCENT_SWATCHES = ['#4f8cff', '#a78bfa', '#34d399', '#f472b6', '#fb923c', '#22d3ee', '#facc15', '#f43f5e'];
-const POSITIVE_SWATCHES = ['#33d6a6', '#4ade80', '#22c55e', '#10b981'];
-const NEGATIVE_SWATCHES = ['#ff6b6b', '#fb7185', '#f43f5e', '#ef4444'];
+// A full spread of distinct main colors — usable for accent, income, and spending.
+const MAIN_COLORS = [
+  '#22c55e', // green
+  '#3b82f6', // blue
+  '#eab308', // yellow
+  '#f97316', // orange
+  '#a855f7', // purple
+  '#14b8a6', // teal
+  '#ef4444', // red
+  '#ec4899', // pink
+  '#06b6d4', // cyan
+  '#84cc16', // lime
+];
+const ACCENT_SWATCHES = MAIN_COLORS;
+const POSITIVE_SWATCHES = MAIN_COLORS;
+const NEGATIVE_SWATCHES = MAIN_COLORS;
 
 export default function Settings() {
   const { palette, presets, setPreset, setColor, resetCustom } = useTheme();
