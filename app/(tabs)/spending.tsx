@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { View, Text, ScrollView, Pressable } from 'react-native';
+import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
-import { Screen, Card, SectionTitle, Row, Pill, Dot } from '../../components/ui';
-import { DonutChart } from '../../components/charts';
+import { Screen, Card, SectionTitle, Row, Pill, Dot, ProgressBar } from '../../components/ui';
+import { DonutChart, BarChart } from '../../components/charts';
 import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
 import { money, dateLabel } from '../../lib/format';
@@ -52,6 +52,77 @@ export default function Spending() {
   );
 
   const segments = byCat.map((c, i) => ({ value: c.amount, color: palette.chart[i % palette.chart.length] }));
+
+  const { width } = useWindowDimensions();
+  const chartW = Math.min(width, 640) - space.lg * 2 - space.lg * 2;
+
+  // ── vs previous period ─────────────────────────────────────────────────────
+  const periodIdx = periods.findIndex((p) => p.key === period.key);
+  const prevPeriod = periodIdx > 0 ? periods[periodIdx - 1] : null;
+  const prevTotal = prevPeriod ? totalSpendingRange(data, prevPeriod.start, prevPeriod.end) : 0;
+  const delta = total - prevTotal;
+
+  // Categories that moved the most vs the previous period
+  const movers = useMemo(() => {
+    if (!prevPeriod) return [];
+    const prevByCat = new Map(spendingByCategoryRange(data, prevPeriod.start, prevPeriod.end).map((c) => [c.category, c.amount]));
+    const names = new Set([...byCat.map((c) => c.category), ...prevByCat.keys()]);
+    return [...names]
+      .map((name) => {
+        const now = byCat.find((c) => c.category === name)?.amount ?? 0;
+        const before = prevByCat.get(name) ?? 0;
+        return { name, now, before, diff: now - before };
+      })
+      .filter((m) => Math.abs(m.diff) >= 1)
+      .sort((a, b) => Math.abs(b.diff) - Math.abs(a.diff))
+      .slice(0, 5);
+  }, [data, byCat, prevPeriod]);
+
+  // ── spending over the period (daily bars; monthly bars in Year view) ──────
+  const { series, seriesLabels } = useMemo(() => {
+    const out: number[] = [];
+    const lab: string[] = [];
+    const spend = txnsInRange(data, period.start, period.end).filter((t) => t.amount < 0);
+    if (mode === 'year') {
+      const year = period.start.slice(0, 4);
+      const byMonth = new Map<string, number>();
+      spend.forEach((t) => byMonth.set(t.date.slice(0, 7), (byMonth.get(t.date.slice(0, 7)) ?? 0) + -t.amount));
+      const monthNames = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+      for (let m = 1; m <= 12; m++) {
+        const key = `${year}-${m < 10 ? '0' : ''}${m}`;
+        out.push(byMonth.get(key) ?? 0);
+        lab.push(monthNames[m - 1]);
+      }
+    } else {
+      const byDay = new Map<string, number>();
+      spend.forEach((t) => byDay.set(t.date, (byDay.get(t.date) ?? 0) + -t.amount));
+      const cur = new Date(period.start);
+      const end = new Date(period.end);
+      let i = 0;
+      while (cur < end) {
+        const m = cur.getMonth() + 1;
+        const day = cur.getDate();
+        const key = `${cur.getFullYear()}-${m < 10 ? '0' : ''}${m}-${day < 10 ? '0' : ''}${day}`;
+        out.push(byDay.get(key) ?? 0);
+        if (mode === 'week') lab.push('SMTWTFS'[cur.getDay()]);
+        else lab.push(day === 1 || day % 5 === 0 ? String(day) : '');
+        cur.setDate(cur.getDate() + 1);
+        i++;
+      }
+    }
+    return { series: out, seriesLabels: lab };
+  }, [data, period, mode]);
+
+  // ── top merchants in the period ────────────────────────────────────────────
+  const merchants = useMemo(() => {
+    const byMerchant = new Map<string, number>();
+    txns.forEach((t) => byMerchant.set(t.merchant, (byMerchant.get(t.merchant) ?? 0) + -t.amount));
+    return [...byMerchant.entries()]
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+  }, [txns]);
+  const merchantMax = Math.max(...merchants.map((m) => m.amount), 1);
 
   const recurring = detectRecurring(data);
   const recurringTop = recurring.slice(0, 4);
@@ -111,6 +182,88 @@ export default function Spending() {
         <Text style={{ color: palette.primary, fontSize: type.tiny, fontWeight: '600', marginTop: 10 }}>
           Tap for full breakdown by group ›
         </Text>
+      </Card>
+
+      {/* vs previous period */}
+      {prevPeriod ? (
+        <Card>
+          <Row style={{ justifyContent: 'space-between' }}>
+            <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>
+              vs {prevPeriod.label}
+            </Text>
+            <Text
+              style={{
+                color: delta <= 0 ? palette.positive : palette.negative,
+                fontSize: type.heading,
+                fontWeight: '800',
+              }}
+            >
+              {delta <= 0 ? '▼' : '▲'} {money(Math.abs(delta))}
+            </Text>
+          </Row>
+          <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 2 }}>
+            {money(total)} this period · {money(prevTotal)} last {mode}
+          </Text>
+          {movers.length > 0 ? (
+            <View style={{ marginTop: space.md, borderTopWidth: 1, borderTopColor: palette.border, paddingTop: space.sm }}>
+              {movers.map((m) => (
+                <Row key={m.name} style={{ justifyContent: 'space-between', paddingVertical: 5 }}>
+                  <Text style={{ color: palette.textMuted, fontSize: type.small, flex: 1 }} numberOfLines={1}>
+                    {m.name}
+                  </Text>
+                  <Text
+                    style={{
+                      color: m.diff <= 0 ? palette.positive : palette.negative,
+                      fontSize: type.small,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {m.diff <= 0 ? '▼' : '▲'} {money(Math.abs(m.diff))}
+                  </Text>
+                </Row>
+              ))}
+            </View>
+          ) : null}
+        </Card>
+      ) : null}
+
+      {/* Spending over the period */}
+      <SectionTitle>{mode === 'year' ? 'By Month' : 'Day by Day'}</SectionTitle>
+      <Card>
+        <BarChart data={series} labels={seriesLabels} width={chartW} height={130} color={palette.negative} />
+      </Card>
+
+      {/* Top merchants */}
+      {merchants.length > 0 ? (
+        <>
+          <SectionTitle>Top Merchants</SectionTitle>
+          <Card style={{ gap: space.md }}>
+            {merchants.map((m) => (
+              <View key={m.name}>
+                <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                  <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600', flex: 1, paddingRight: 10 }} numberOfLines={1}>
+                    {m.name}
+                  </Text>
+                  <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '700' }}>{money(m.amount)}</Text>
+                </Row>
+                <ProgressBar pct={(m.amount / merchantMax) * 100} />
+              </View>
+            ))}
+          </Card>
+        </>
+      ) : null}
+
+      {/* Trends & Insights */}
+      <Card onPress={() => router.push('/trends')}>
+        <Row style={{ justifyContent: 'space-between' }}>
+          <View style={{ flex: 1 }}>
+            <Text style={{ color: palette.text, fontSize: type.heading, fontWeight: '700' }}>Trends & Insights</Text>
+            <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: 2 }}>
+              Month-to-month by group, income vs spending, by account
+            </Text>
+          </View>
+          <ChevronRight color={palette.textMuted} />
+        </Row>
       </Card>
 
       {/* Recurring */}
