@@ -11,6 +11,7 @@ import {
   totalIncome,
   totalSpending,
   txnsInRange,
+  spendingByCategory,
   spendingByCategoryRange,
   accountName,
 } from '../lib/calc';
@@ -19,6 +20,7 @@ const RANGES = [
   { key: 3, label: '3 mo' },
   { key: 6, label: '6 mo' },
   { key: 12, label: '12 mo' },
+  { key: 24, label: '24 mo' },
 ];
 
 function ymd(d: Date): string {
@@ -35,6 +37,7 @@ export default function Trends() {
   const chartW = Math.min(width, 640) - space.lg * 2 - space.lg * 2;
 
   const [months, setMonths] = useState(6);
+  const [chartCat, setChartCat] = useState<string | null>(null);
 
   const keys = recentMonthKeys(months);
   const incomeSeries = keys.map((k) => totalIncome(data, k));
@@ -57,6 +60,13 @@ export default function Trends() {
   // Category spending in range
   const cats = spendingByCategoryRange(data, start, end);
   const catMax = Math.max(...cats.map((c) => c.amount), 1);
+
+  // Month-by-month history for one selected group
+  const selectedCat = chartCat && cats.some((c) => c.category === chartCat) ? chartCat : cats[0]?.category ?? null;
+  const catSeries = selectedCat
+    ? keys.map((k) => spendingByCategory(data, k).find((c) => c.category === selectedCat)?.amount ?? 0)
+    : [];
+  const catTotal = catSeries.reduce((s, v) => s + v, 0);
 
   return (
     <Screen title="Trends" subtitle="Income, spending & accounts over time" onBack={() => router.back()}>
@@ -134,6 +144,36 @@ export default function Trends() {
               <ProgressBar pct={(a.amount / accountMax) * 100} />
             </View>
           ))}
+        </Card>
+      )}
+
+      {/* One group, month to month */}
+      <SectionTitle>Group Month to Month</SectionTitle>
+      {selectedCat ? (
+        <Card>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: space.md }}>
+            {cats.slice(0, 10).map((c) => (
+              <Pill
+                key={c.category}
+                label={c.category}
+                active={c.category === selectedCat}
+                onPress={() => setChartCat(c.category)}
+              />
+            ))}
+          </View>
+          <Row style={{ justifyContent: 'space-between', marginBottom: 4 }}>
+            <Text style={{ color: palette.textMuted, fontSize: type.tiny }}>
+              {selectedCat} · last {months} months
+            </Text>
+            <Text style={{ color: palette.text, fontSize: type.tiny, fontWeight: '700' }}>
+              {money(catTotal)} total · {money(catTotal / Math.max(keys.length, 1))}/mo avg
+            </Text>
+          </Row>
+          <BarChart data={catSeries} labels={labels} width={chartW} height={130} color={palette.primary} />
+        </Card>
+      ) : (
+        <Card>
+          <Text style={{ color: palette.textMuted, fontSize: type.small }}>No spending in this range.</Text>
         </Card>
       )}
 

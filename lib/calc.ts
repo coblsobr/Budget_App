@@ -262,10 +262,16 @@ export function findTxn(d: DataSet, id: string): Txn | undefined {
 
 // ─── Personal (per-person) budgets ───────────────────────────────────────────────
 
-/** Whether a transaction counts toward a person, per their card+category includes. */
+/**
+ * Whether a transaction counts toward a person.
+ * 1. A manual per-transaction assignment wins and is exclusive (only that person).
+ * 2. Otherwise it counts if the person opted in that card+category (the ⋮ rules).
+ */
 export function txnCountsForPerson(d: DataSet, person: string, t: Txn): boolean {
   if (t.amount >= 0) return false;
   if (isExcluded(d, t.id)) return false;
+  const assigned = d.txnPerson?.[t.id];
+  if (assigned) return assigned === person;
   const pb = (d.personBudgets ?? []).find((b) => b.person === person);
   const cats = pb?.included?.[t.accountId];
   return !!cats && cats.includes(t.category);

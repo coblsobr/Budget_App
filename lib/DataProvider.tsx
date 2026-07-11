@@ -14,6 +14,7 @@ import {
   Txn,
 } from './types';
 import { applyAccountClasses } from './reclass';
+import { IMPORTED_TXNS } from './importedTxns.generated';
 import { sampleDataSet } from './data';
 import { snapshotFor } from './calc';
 import { claimAccessUrl, fetchAccounts, defaultStartDate } from './simplefin';
@@ -131,7 +132,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     lastBaseRef.current = base;
     baseTxnsRef.current = base.transactions;
     if (cfg.importedTxns) importedRef.current = cfg.importedTxns;
-    const combined = [...base.transactions, ...importedRef.current];
+    // Bundled Rocket Money history (importedTxns.generated.ts) backfills the
+    // years SimpleFIN can't reach. Deduped by date+amount+merchant so the
+    // recent overlap with synced data never counts twice.
+    const live = [...base.transactions, ...importedRef.current];
+    const seen = new Set(live.map((t) => `${t.date}|${Math.round(t.amount * 100)}|${t.merchant.trim().toLowerCase()}`));
+    const bundled = IMPORTED_TXNS.filter(
+      (t) => !seen.has(`${t.date}|${Math.round(t.amount * 100)}|${t.merchant.trim().toLowerCase()}`)
+    );
+    const combined = [...live, ...bundled];
     rawTxnsRef.current = combined;
     const composed: DataSet = {
       ...base,
