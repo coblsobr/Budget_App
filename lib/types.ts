@@ -66,6 +66,8 @@ export type Txn = {
   amount: number; // negative = spending, positive = income
   category: Category;
   accountId: string;
+  /** Original bank-supplied merchant text, kept when the user renames it. */
+  rawMerchant?: string;
 };
 
 export type Budget = {
@@ -137,6 +139,10 @@ export type DataSet = {
   manualAssets?: ManualAsset[];
   /** Real month-by-month net worth, accumulated from sync snapshots when available. */
   snapshots?: NetWorthPoint[];
+  /** Vendor display-name overrides (merchantKey of raw name -> friendly name). */
+  merchantNames?: Record<string, string>;
+  /** Single-transaction display-name overrides (txnId -> friendly name). */
+  txnNames?: Record<string, string>;
 };
 
 /** A manually-entered asset not tied to a linked account (car, house, etc.). */

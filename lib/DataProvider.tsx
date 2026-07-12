@@ -47,6 +47,10 @@ import {
   saveManualAssets,
   loadAccountClasses,
   saveAccountClasses,
+  loadMerchantNames,
+  saveMerchantNames,
+  loadTxnNames,
+  saveTxnNames,
   loadImportedTxns,
   saveImportedTxns,
   loadSnapshots,
@@ -88,6 +92,10 @@ type DataContextValue = {
   /** What the user says each account really is (fixes misclassification). */
   accountClasses: AccountClassOverrides;
   setAccountClass: (accountId: string, cls: AccountClass | null) => Promise<void>;
+  /** Rename one transaction (null clears). */
+  setTxnName: (txnId: string, name: string | null) => Promise<void>;
+  /** Rename every transaction from a vendor — pass the RAW merchant text (null clears). */
+  setMerchantName: (rawMerchant: string, name: string | null) => Promise<void>;
   /** Merge imported transactions (deduped). Returns counts. */
   importTransactions: (txns: Txn[]) => { added: number; skipped: number };
 };
@@ -107,6 +115,8 @@ type Config = {
   importedTxns?: Txn[];
   snapshots?: DataSet['snapshots'];
   accountClasses?: AccountClassOverrides;
+  merchantNames?: Record<string, string>;
+  txnNames?: Record<string, string>;
 };
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
@@ -154,14 +164,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       ignoreRules: cfg.ignoreRules ?? base.ignoreRules ?? [],
       manualAssets: cfg.manualAssets ?? base.manualAssets ?? [],
       snapshots: cfg.snapshots ?? base.snapshots,
+      merchantNames: cfg.merchantNames ?? {},
+      txnNames: cfg.txnNames ?? {},
       transactions: applyRules(combined, rules),
     };
+    // Apply user display names (per-transaction beats per-vendor); keep the raw
+    // bank text on the txn so rules/renames always key off the original.
+    const mNames = cfg.merchantNames ?? {};
+    const tNames = cfg.txnNames ?? {};
+    if (Object.keys(mNames).length || Object.keys(tNames).length) {
+      composed.transactions = composed.transactions.map((t) => {
+        const display = tNames[t.id] ?? mNames[merchantKey(t.merchant)];
+        return display ? { ...t, rawMerchant: t.merchant, merchant: display } : t;
+      });
+    }
     // Move any user-reclassified accounts into their correct buckets.
     return applyAccountClasses(composed, cfg.accountClasses ?? {});
   }
 
   async function loadConfig(): Promise<Config> {
-    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules, manualAssets, importedTxns, accountClassesStored] = await Promise.all([
+    const [budgets, categories, merchantRules, people, personBudgets, txnPerson, excludedTxns, ignoreRules, manualAssets, importedTxns, accountClassesStored, merchantNamesStored, txnNamesStored] = await Promise.all([
       loadBudgets(),
       loadCategories(),
       loadMerchantRules(),
@@ -173,6 +195,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       loadManualAssets(),
       loadImportedTxns(),
       loadAccountClasses(),
+      loadMerchantNames(),
+      loadTxnNames(),
     ]);
     if (accountClassesStored) setAccountClasses(accountClassesStored);
     return {
@@ -187,6 +211,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       manualAssets: manualAssets ?? undefined,
       importedTxns: importedTxns ?? undefined,
       accountClasses: accountClassesStored ?? undefined,
+      merchantNames: merchantNamesStored ?? undefined,
+      txnNames: txnNamesStored ?? undefined,
     };
   }
 
@@ -440,6 +466,24 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       // immediately (and correctly reverses a previous override).
       const cfg = await loadConfig();
       setData(compose(lastBaseRef.current, { ...cfg, accountClasses: next }));
+    },
+    setTxnName: async (txnId: string, name: string | null) => {
+      const stored = (await loadTxnNames()) ?? {};
+      const clean = name?.trim();
+      if (clean) stored[txnId] = clean;
+      else delete stored[txnId];
+      await saveTxnNames(stored);
+      const cfg = await loadConfig();
+      setData(compose(lastBaseRef.current, cfg));
+    },
+    setMerchantName: async (rawMerchant: string, name: string | null) => {
+      const stored = (await loadMerchantNames()) ?? {};
+      const clean = name?.trim();
+      if (clean) stored[merchantKey(rawMerchant)] = clean;
+      else delete stored[merchantKey(rawMerchant)];
+      await saveMerchantNames(stored);
+      const cfg = await loadConfig();
+      setData(compose(lastBaseRef.current, cfg));
     },
     importTransactions: (txns: Txn[]) => {
       const existing = data.transactions;

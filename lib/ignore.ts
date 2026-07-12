@@ -31,6 +31,12 @@ function daysBetween(a: string, b: string): number {
   return Math.abs((new Date(a).getTime() - new Date(b).getTime()) / 86400000);
 }
 
+// Match against both the display name and the original bank text, so a
+// user-renamed transaction is still recognized as a payment/transfer.
+function mtext(t: Txn): string {
+  return t.rawMerchant ? `${t.merchant} ${t.rawMerchant}` : t.merchant;
+}
+
 // Memoized per transactions-array (compose() creates a fresh array each time).
 const autoCache = new WeakMap<Txn[], Set<string>>();
 
@@ -46,11 +52,11 @@ export function autoIgnoredIds(d: DataSet): Set<string> {
 
   // Rules 1–3: obvious from merchant text + account type
   for (const t of d.transactions) {
-    if (creditIds.has(t.accountId) && t.amount > 0 && PAY_RE.test(t.merchant)) {
+    if (creditIds.has(t.accountId) && t.amount > 0 && PAY_RE.test(mtext(t))) {
       ids.add(t.id); // payment received by the card
-    } else if (cashIds.has(t.accountId) && t.amount < 0 && PAY_RE.test(t.merchant) && CARDISH_RE.test(t.merchant)) {
+    } else if (cashIds.has(t.accountId) && t.amount < 0 && PAY_RE.test(mtext(t)) && CARDISH_RE.test(mtext(t))) {
       ids.add(t.id); // bank-side card payment
-    } else if (cashIds.has(t.accountId) && XFER_RE.test(t.merchant)) {
+    } else if (cashIds.has(t.accountId) && XFER_RE.test(mtext(t))) {
       ids.add(t.id); // transfer between own bank accounts
     }
   }
@@ -58,7 +64,7 @@ export function autoIgnoredIds(d: DataSet): Set<string> {
   // Rule 4: pair matching — bank money out ↔ credit money in, equal amounts,
   // within 5 days, where at least one side hints payment/transfer. Each txn
   // pairs at most once.
-  const hint = (t: Txn) => PAY_RE.test(t.merchant) || XFER_RE.test(t.merchant);
+  const hint = (t: Txn) => PAY_RE.test(mtext(t)) || XFER_RE.test(mtext(t));
   const credits = d.transactions.filter((t) => creditIds.has(t.accountId) && t.amount > 0 && !ids.has(t.id));
   const bankOut = d.transactions.filter((t) => cashIds.has(t.accountId) && t.amount < 0);
   const used = new Set<string>();

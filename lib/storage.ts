@@ -65,6 +65,8 @@ const K = {
   snapshots: 'networth_snapshots',
   lastSync: 'last_sync',
   accountClasses: 'account_classes',
+  merchantNames: 'merchant_names',
+  txnNames: 'txn_names',
 } as const;
 
 async function getJSON<T>(key: string): Promise<T | null> {
@@ -123,6 +125,34 @@ export async function loadAccountClasses(): Promise<AccountClassOverrides | null
   if (!raw) return null;
   try {
     return JSON.parse(raw) as AccountClassOverrides;
+  } catch {
+    return null;
+  }
+}
+
+// ─── display-name overrides (user-owned) ─────────────────────────────────────────
+
+export async function saveMerchantNames(names: Record<string, string>) {
+  await kvSet(K.merchantNames, JSON.stringify(names));
+}
+export async function loadMerchantNames(): Promise<Record<string, string> | null> {
+  const raw = await kvGet(K.merchantNames);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return null;
+  }
+}
+
+export async function saveTxnNames(names: Record<string, string>) {
+  await kvSet(K.txnNames, JSON.stringify(names));
+}
+export async function loadTxnNames(): Promise<Record<string, string> | null> {
+  const raw = await kvGet(K.txnNames);
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw) as Record<string, string>;
   } catch {
     return null;
   }

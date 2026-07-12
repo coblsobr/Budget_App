@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { View, Text, ScrollView, Pressable, useWindowDimensions } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen, Card, SectionTitle, Row, Pill, Dot, ProgressBar } from '../../components/ui';
-import { DonutChart, BarChart } from '../../components/charts';
+import { DonutChart, BarChart, LineChart } from '../../components/charts';
 import { ChevronRight } from '../../components/icons';
 import { useTheme, type, radius, space } from '../../theme/theme';
 import { money, dateLabel } from '../../lib/format';
@@ -79,39 +79,89 @@ export default function Spending() {
   }, [data, byCat, prevPeriod]);
 
   // ── spending over the period (daily bars; monthly bars in Year view) ──────
+  // Parse "yyyy-mm-dd" as a LOCAL date (new Date(iso) would treat it as UTC and
+  // shift a day in US timezones).
+  const localDate = (iso: string) => {
+    const [y, m, d] = iso.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  };
+  const isoOf = (dt: Date) => {
+    const m = dt.getMonth() + 1;
+    const day = dt.getDate();
+    return `${dt.getFullYear()}-${m < 10 ? '0' : ''}${m}-${day < 10 ? '0' : ''}${day}`;
+  };
+
+  // Daily totals between start (inclusive) and end (exclusive).
+  const dailyTotals = (start: string, end: string) => {
+    const byDay = new Map<string, number>();
+    txnsInRange(data, start, end)
+      .filter((t) => t.amount < 0)
+      .forEach((t) => byDay.set(t.date, (byDay.get(t.date) ?? 0) + -t.amount));
+    const out: { key: string; value: number; dt: Date }[] = [];
+    const cur = localDate(start);
+    const endDt = localDate(end);
+    while (cur < endDt) {
+      const key = isoOf(cur);
+      out.push({ key, value: byDay.get(key) ?? 0, dt: new Date(cur) });
+      cur.setDate(cur.getDate() + 1);
+    }
+    return out;
+  };
+
   const { series, seriesLabels } = useMemo(() => {
-    const out: number[] = [];
-    const lab: string[] = [];
-    const spend = txnsInRange(data, period.start, period.end).filter((t) => t.amount < 0);
     if (mode === 'year') {
       const year = period.start.slice(0, 4);
       const byMonth = new Map<string, number>();
-      spend.forEach((t) => byMonth.set(t.date.slice(0, 7), (byMonth.get(t.date.slice(0, 7)) ?? 0) + -t.amount));
+      txnsInRange(data, period.start, period.end)
+        .filter((t) => t.amount < 0)
+        .forEach((t) => byMonth.set(t.date.slice(0, 7), (byMonth.get(t.date.slice(0, 7)) ?? 0) + -t.amount));
       const monthNames = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+      const out: number[] = [];
+      const lab: string[] = [];
       for (let m = 1; m <= 12; m++) {
-        const key = `${year}-${m < 10 ? '0' : ''}${m}`;
-        out.push(byMonth.get(key) ?? 0);
+        out.push(byMonth.get(`${year}-${m < 10 ? '0' : ''}${m}`) ?? 0);
         lab.push(monthNames[m - 1]);
       }
-    } else {
-      const byDay = new Map<string, number>();
-      spend.forEach((t) => byDay.set(t.date, (byDay.get(t.date) ?? 0) + -t.amount));
-      const cur = new Date(period.start);
-      const end = new Date(period.end);
-      let i = 0;
-      while (cur < end) {
-        const m = cur.getMonth() + 1;
-        const day = cur.getDate();
-        const key = `${cur.getFullYear()}-${m < 10 ? '0' : ''}${m}-${day < 10 ? '0' : ''}${day}`;
-        out.push(byDay.get(key) ?? 0);
-        if (mode === 'week') lab.push('SMTWTFS'[cur.getDay()]);
-        else lab.push(day === 1 || day % 5 === 0 ? String(day) : '');
-        cur.setDate(cur.getDate() + 1);
-        i++;
-      }
+      return { series: out, seriesLabels: lab };
     }
-    return { series: out, seriesLabels: lab };
+    const days = dailyTotals(period.start, period.end);
+    return {
+      series: days.map((d) => d.value),
+      seriesLabels: days.map((d) =>
+        mode === 'week' ? 'SMTWTFS'[d.dt.getDay()] : d.dt.getDate() === 1 || d.dt.getDate() % 5 === 0 ? String(d.dt.getDate()) : ''
+      ),
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, period, mode]);
+
+  // ── pace: cumulative spend this period vs previous period ─────────────────
+  const pace = useMemo(() => {
+    if (mode === 'year' || !prevPeriod) return null;
+    const cum = (vals: number[]) => {
+      let s = 0;
+      return vals.map((v) => (s += v));
+    };
+    const todayIso = isoOf(new Date());
+    const curDays = dailyTotals(period.start, period.end);
+    // Only draw up to today for an in-progress period.
+    const elapsed = curDays.filter((d) => d.key <= todayIso);
+    const current = cum(elapsed.map((d) => d.value));
+    const previous = cum(dailyTotals(prevPeriod.start, prevPeriod.end).map((d) => d.value));
+    if (current.length === 0 || previous.length === 0) return null;
+    return { current, previous, prevFinal: previous[previous.length - 1] };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, period, prevPeriod, mode]);
+
+  // ── spending by day of week ────────────────────────────────────────────────
+  const weekdayTotals = useMemo(() => {
+    const totals = new Array(7).fill(0);
+    txnsInRange(data, period.start, period.end)
+      .filter((t) => t.amount < 0)
+      .forEach((t) => (totals[localDate(t.date).getDay()] += -t.amount));
+    return totals;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, period]);
+  const weekdayLabels = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
   // ── top merchants in the period ────────────────────────────────────────────
   const merchants = useMemo(() => {
@@ -227,10 +277,48 @@ export default function Spending() {
         </Card>
       ) : null}
 
+      {/* Pace: cumulative this period vs last */}
+      {pace ? (
+        <>
+          <SectionTitle>Pace</SectionTitle>
+          <Card>
+            <Row style={{ gap: 16, marginBottom: 6 }}>
+              <Row style={{ gap: 6 }}>
+                <Dot color={palette.primary} />
+                <Text style={{ color: palette.textMuted, fontSize: type.small }}>This {mode}</Text>
+              </Row>
+              <Row style={{ gap: 6 }}>
+                <Dot color={palette.textMuted} />
+                <Text style={{ color: palette.textMuted, fontSize: type.small }}>{prevPeriod!.label}</Text>
+              </Row>
+            </Row>
+            <LineChart
+              data={pace.current}
+              compare={pace.previous}
+              width={chartW}
+              height={140}
+              color={palette.primary}
+            />
+            <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 6 }}>
+              {money(total)} so far · {prevPeriod!.label} ended at {money(pace.prevFinal)}
+            </Text>
+          </Card>
+        </>
+      ) : null}
+
       {/* Spending over the period */}
       <SectionTitle>{mode === 'year' ? 'By Month' : 'Day by Day'}</SectionTitle>
       <Card>
         <BarChart data={series} labels={seriesLabels} width={chartW} height={130} color={palette.negative} />
+      </Card>
+
+      {/* Day of week */}
+      <SectionTitle>By Day of Week</SectionTitle>
+      <Card>
+        <BarChart data={weekdayTotals} labels={weekdayLabels} width={chartW} height={120} color={palette.warning} />
+        <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginTop: 6 }}>
+          Total spent per weekday across {period.label}
+        </Text>
       </Card>
 
       {/* Top merchants */}

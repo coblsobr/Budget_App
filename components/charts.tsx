@@ -23,6 +23,8 @@ export function LineChart({
   height = 160,
   color,
   showAxis = true,
+  compare,
+  compareColor,
 }: {
   data: number[];
   labels?: string[];
@@ -30,9 +32,13 @@ export function LineChart({
   height?: number;
   color?: string;
   showAxis?: boolean;
+  /** Optional reference series drawn as a dashed line (no area fill). */
+  compare?: number[];
+  compareColor?: string;
 }) {
   const { palette } = useTheme();
   const stroke = color ?? palette.primary;
+  const compareStroke = compareColor ?? palette.textMuted;
   if (data.length === 0) return null;
 
   const padL = showAxis ? 44 : 8;
@@ -44,15 +50,20 @@ export function LineChart({
   const innerW = w - padL - padR;
   const innerH = h - padT - padB;
 
-  const min = Math.min(...data);
-  const max = Math.max(...data);
+  const all = compare && compare.length ? [...data, ...compare] : data;
+  const min = Math.min(...all);
+  const max = Math.max(...all);
   const range = max - min || 1;
 
-  const x = (i: number) => padL + (data.length === 1 ? innerW / 2 : (i / (data.length - 1)) * innerW);
+  const nPts = Math.max(data.length, compare?.length ?? 0);
+  const x = (i: number) => padL + (nPts === 1 ? innerW / 2 : (i / (nPts - 1)) * innerW);
   const y = (v: number) => padT + innerH - ((v - min) / range) * innerH;
 
   const linePath = data.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
   const areaPath = `${linePath} L ${x(data.length - 1).toFixed(1)} ${padT + innerH} L ${x(0).toFixed(1)} ${padT + innerH} Z`;
+  const comparePath = compare && compare.length
+    ? compare.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')
+    : null;
 
   const gridVals = [min, min + range / 2, max];
 
@@ -75,6 +86,18 @@ export function LineChart({
           </G>
         ))}
 
+      {comparePath ? (
+        <Path
+          d={comparePath}
+          fill="none"
+          stroke={compareStroke}
+          strokeWidth={2}
+          strokeDasharray="5 5"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+          opacity={0.8}
+        />
+      ) : null}
       <Path d={areaPath} fill="url(#areaFill)" />
       <Path d={linePath} fill="none" stroke={stroke} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
       <Circle cx={x(data.length - 1)} cy={y(data[data.length - 1])} r={4} fill={stroke} />

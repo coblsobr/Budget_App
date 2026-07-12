@@ -21,12 +21,15 @@ export default function TransactionDetail() {
   const { palette } = useTheme();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { data, setMerchantRule, clearMerchantRule, addCategory, setTxnPerson, addIgnoreRule } = useData();
+  const { data, setMerchantRule, clearMerchantRule, addCategory, setTxnPerson, addIgnoreRule, setTxnName, setMerchantName } = useData();
 
   const txn = findTxn(data, String(id));
   const [newGroup, setNewGroup] = useState('');
   const [adding, setAdding] = useState(false);
   const [ignoreMsg, setIgnoreMsg] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [renameMsg, setRenameMsg] = useState<string | null>(null);
 
   if (!txn) {
     return (
@@ -39,16 +42,35 @@ export default function TransactionDetail() {
   }
 
   const isIncome = txn.amount > 0;
-  const hasRule = !!data.merchantRules[merchantKey(txn.merchant)];
   const groups = spendingCategories(data.categories);
 
-  const pick = (category: string) => setMerchantRule(txn.merchant, category);
+  // Renames and category rules always key off the original bank text (rules are
+  // applied to raw transactions before display names).
+  const rawName = txn.rawMerchant ?? txn.merchant;
+  const hasRule = !!data.merchantRules[merchantKey(rawName)];
+  const hasTxnName = !!data.txnNames?.[txn.id];
+  const hasVendorName = !!data.merchantNames?.[merchantKey(rawName)];
+
+  const saveTxnRename = async () => {
+    if (!draftName.trim()) return;
+    await setTxnName(txn.id, draftName);
+    setRenaming(false);
+    setRenameMsg('Renamed this transaction.');
+  };
+  const saveVendorRename = async () => {
+    if (!draftName.trim()) return;
+    await setMerchantName(rawName, draftName);
+    setRenaming(false);
+    setRenameMsg(`Renamed everything from "${rawName}".`);
+  };
+
+  const pick = (category: string) => setMerchantRule(rawName, category);
 
   const addAndPick = () => {
     const clean = newGroup.trim();
     if (!clean) return;
     addCategory(clean);
-    setMerchantRule(txn.merchant, clean);
+    setMerchantRule(rawName, clean);
     setNewGroup('');
     setAdding(false);
   };
@@ -78,6 +100,77 @@ export default function TransactionDetail() {
         <DetailRow label="Account" value={accountName(data, txn.accountId)} />
         <DetailRow label="Type" value={isIncome ? 'Income' : 'Spending'} />
       </Card>
+
+      {/* Rename */}
+      <SectionTitle>Name</SectionTitle>
+      <Text style={{ color: palette.textMuted, fontSize: type.small, marginTop: -4 }}>
+        Give this a readable name instead of the bank's text
+        {txn.rawMerchant ? (
+          <Text> (originally "{txn.rawMerchant}")</Text>
+        ) : null}
+        .
+      </Text>
+      <Card>
+        {renaming ? (
+          <>
+            <TextInput
+              value={draftName}
+              onChangeText={setDraftName}
+              placeholder="e.g. Netflix"
+              placeholderTextColor={palette.textMuted}
+              autoFocus
+              style={{
+                backgroundColor: palette.surfaceAlt,
+                borderRadius: radius.md,
+                color: palette.text,
+                paddingHorizontal: 12,
+                paddingVertical: 10,
+                fontSize: type.small,
+              }}
+            />
+            <Row style={{ gap: 8, marginTop: space.md }}>
+              <Pressable
+                onPress={saveTxnRename}
+                style={{ flex: 1, paddingVertical: 11, backgroundColor: palette.primary, borderRadius: radius.md, alignItems: 'center' }}
+              >
+                <Text style={{ color: '#fff', fontWeight: '700', fontSize: type.small }}>Just this one</Text>
+              </Pressable>
+              <Pressable
+                onPress={saveVendorRename}
+                style={{ flex: 1, paddingVertical: 11, backgroundColor: palette.surfaceAlt, borderRadius: radius.md, alignItems: 'center' }}
+              >
+                <Text style={{ color: palette.text, fontWeight: '700', fontSize: type.small }}>All from this vendor</Text>
+              </Pressable>
+            </Row>
+            <Pressable onPress={() => setRenaming(false)} style={{ marginTop: space.md, alignItems: 'center' }}>
+              <Text style={{ color: palette.textMuted, fontSize: type.small, fontWeight: '600' }}>Cancel</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable onPress={() => (setDraftName(txn.merchant), setRenaming(true))}>
+              <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '700' }}>Rename "{txn.merchant}"…</Text>
+            </Pressable>
+            {hasTxnName ? (
+              <Pressable onPress={() => setTxnName(txn.id, null)} style={{ marginTop: space.md }}>
+                <Text style={{ color: palette.negative, fontSize: type.small, fontWeight: '600' }}>
+                  Reset this transaction's name
+                </Text>
+              </Pressable>
+            ) : null}
+            {hasVendorName ? (
+              <Pressable onPress={() => setMerchantName(rawName, null)} style={{ marginTop: space.md }}>
+                <Text style={{ color: palette.negative, fontSize: type.small, fontWeight: '600' }}>
+                  Reset the vendor-wide name
+                </Text>
+              </Pressable>
+            ) : null}
+          </>
+        )}
+      </Card>
+      {renameMsg ? (
+        <Text style={{ color: palette.positive, fontSize: type.small, fontWeight: '600' }}>{renameMsg}</Text>
+      ) : null}
 
       {/* Person */}
       <SectionTitle>Person</SectionTitle>
@@ -219,7 +312,7 @@ export default function TransactionDetail() {
           </Card>
 
           {hasRule ? (
-            <Pressable onPress={() => clearMerchantRule(txn.merchant)} style={{ paddingVertical: 8 }}>
+            <Pressable onPress={() => clearMerchantRule(rawName)} style={{ paddingVertical: 8 }}>
               <Text style={{ color: palette.negative, fontSize: type.small, fontWeight: '600' }}>
                 Remove auto-rule for {txn.merchant}
               </Text>
