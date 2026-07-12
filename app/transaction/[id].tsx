@@ -100,6 +100,14 @@ export default function TransactionDetail() {
         <DetailRow label="Account" value={accountName(data, txn.accountId)} />
         <DetailRow label="Type" value={isIncome ? 'Income' : 'Spending'} />
       </Card>
+      <Pressable
+        onPress={() => router.push({ pathname: '/merchant/[name]', params: { name: txn.merchant } })}
+        style={{ paddingVertical: 4 }}
+      >
+        <Text style={{ color: palette.primary, fontSize: type.small, fontWeight: '700' }}>
+          See all history from "{txn.merchant}" ›
+        </Text>
+      </Pressable>
 
       {/* Rename */}
       <SectionTitle>Name</SectionTitle>

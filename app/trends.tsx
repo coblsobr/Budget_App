@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { View, Text, useWindowDimensions } from 'react-native';
+import { View, Text, useWindowDimensions, ScrollView, Pressable } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Screen, Card, SectionTitle, Row, Pill, Dot, ProgressBar } from '../components/ui';
 import { BarChart } from '../components/charts';
@@ -67,6 +67,24 @@ export default function Trends() {
     ? keys.map((k) => spendingByCategory(data, k).find((c) => c.category === selectedCat)?.amount ?? 0)
     : [];
   const catTotal = catSeries.reduce((s, v) => s + v, 0);
+
+  // Heatmap: months × top groups, cell intensity = spend that month
+  const heatCats = cats.slice(0, 8).map((c) => c.category);
+  const monthCatMaps = keys.map((k) => new Map(spendingByCategory(data, k).map((c) => [c.category, c.amount])));
+  const heatMax = Math.max(...heatCats.flatMap((c) => monthCatMaps.map((m) => m.get(c) ?? 0)), 1);
+
+  // Income by source over the range
+  const incomeBySource = (() => {
+    const by = new Map<string, number>();
+    txnsInRange(data, start, end)
+      .filter((t) => t.amount > 0)
+      .forEach((t) => by.set(t.merchant, (by.get(t.merchant) ?? 0) + t.amount));
+    return [...by.entries()]
+      .map(([name, amount]) => ({ name, amount }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 6);
+  })();
+  const incomeMax = Math.max(...incomeBySource.map((s) => s.amount), 1);
 
   return (
     <Screen title="Trends" subtitle="Income, spending & accounts over time" onBack={() => router.back()}>
@@ -196,6 +214,89 @@ export default function Trends() {
               </Row>
               <ProgressBar pct={(c.amount / catMax) * 100} color={palette.chart[i % palette.chart.length]} />
             </View>
+          ))}
+        </Card>
+      )}
+
+      {/* Heatmap: groups × months */}
+      <SectionTitle>Heatmap</SectionTitle>
+      {heatCats.length === 0 ? (
+        <Card>
+          <Text style={{ color: palette.textMuted, fontSize: type.small }}>No spending in this range.</Text>
+        </Card>
+      ) : (
+        <Card>
+          <Text style={{ color: palette.textMuted, fontSize: type.tiny, marginBottom: space.md }}>
+            Darker = more spent that month
+          </Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+            <View>
+              {/* Month header row */}
+              <Row style={{ marginBottom: 6 }}>
+                <View style={{ width: 92 }} />
+                {keys.map((k) => (
+                  <Text
+                    key={k}
+                    style={{ width: 34, color: palette.textMuted, fontSize: 9, textAlign: 'center' }}
+                    numberOfLines={1}
+                  >
+                    {monthLabel(k).split(' ')[0]}
+                  </Text>
+                ))}
+              </Row>
+              {heatCats.map((cat) => (
+                <Row key={cat} style={{ marginBottom: 4, alignItems: 'center' }}>
+                  <Text
+                    style={{ width: 92, color: palette.textMuted, fontSize: type.tiny, paddingRight: 6 }}
+                    numberOfLines={1}
+                  >
+                    {cat}
+                  </Text>
+                  {keys.map((k, mi) => {
+                    const v = monthCatMaps[mi].get(cat) ?? 0;
+                    return (
+                      <View key={k} style={{ width: 34, alignItems: 'center' }}>
+                        <View
+                          style={{
+                            width: 30,
+                            height: 24,
+                            borderRadius: 5,
+                            backgroundColor: v > 0 ? palette.primary : palette.surfaceAlt,
+                            opacity: v > 0 ? 0.15 + 0.85 * (v / heatMax) : 1,
+                          }}
+                        />
+                      </View>
+                    );
+                  })}
+                </Row>
+              ))}
+            </View>
+          </ScrollView>
+        </Card>
+      )}
+
+      {/* Income by source */}
+      <SectionTitle>Income by Source</SectionTitle>
+      {incomeBySource.length === 0 ? (
+        <Card>
+          <Text style={{ color: palette.textMuted, fontSize: type.small }}>No income in this range.</Text>
+        </Card>
+      ) : (
+        <Card style={{ gap: space.md }}>
+          {incomeBySource.map((s) => (
+            <Pressable
+              key={s.name}
+              onPress={() => router.push({ pathname: '/merchant/[name]', params: { name: s.name } })}
+              style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+            >
+              <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600', flex: 1, paddingRight: 10 }} numberOfLines={1}>
+                  {s.name}
+                </Text>
+                <Text style={{ color: palette.positive, fontSize: type.small, fontWeight: '700' }}>+{money(s.amount)}</Text>
+              </Row>
+              <ProgressBar pct={(s.amount / incomeMax) * 100} color={palette.positive} />
+            </Pressable>
           ))}
         </Card>
       )}

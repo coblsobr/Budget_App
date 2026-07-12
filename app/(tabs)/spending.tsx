@@ -327,15 +327,22 @@ export default function Spending() {
           <SectionTitle>Top Merchants</SectionTitle>
           <Card style={{ gap: space.md }}>
             {merchants.map((m) => (
-              <View key={m.name}>
+              <Pressable
+                key={m.name}
+                onPress={() => router.push({ pathname: '/merchant/[name]', params: { name: m.name } })}
+                style={({ pressed }) => [pressed && { opacity: 0.6 }]}
+              >
                 <Row style={{ justifyContent: 'space-between', marginBottom: 6 }}>
                   <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '600', flex: 1, paddingRight: 10 }} numberOfLines={1}>
                     {m.name}
                   </Text>
-                  <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '700' }}>{money(m.amount)}</Text>
+                  <Row style={{ gap: 4 }}>
+                    <Text style={{ color: palette.text, fontSize: type.small, fontWeight: '700' }}>{money(m.amount)}</Text>
+                    <ChevronRight color={palette.textMuted} size={16} />
+                  </Row>
                 </Row>
                 <ProgressBar pct={(m.amount / merchantMax) * 100} />
-              </View>
+              </Pressable>
             ))}
           </Card>
         </>
